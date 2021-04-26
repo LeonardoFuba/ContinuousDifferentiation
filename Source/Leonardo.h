@@ -3,7 +3,7 @@
 #define LEONARDO_H_DEFINED
 
 #ifdef _WIN32
-    #include <Windows.h>
+	#include <Windows.h>
 #endif
 
 #include <ProcessorHeaders.h>
@@ -21,10 +21,10 @@ namespace LeonardoSpace
 		~Leonardo();
 
 		/** Indicates if the processor has a custom editor. Defaults to false */
-		bool hasEditor() const override { return false; }
+		bool hasEditor() const override { return true; }
 
 		/** If the processor has a custom editor, this method must be defined to instantiate it. */
-		//AudioProcessorEditor* createEditor() override;
+		AudioProcessorEditor* createEditor() override;
 
 		/** Optional method that informs the GUI if the processor is ready to function. If false acquisition cannot start. Defaults to true */
 		//bool isReady();
@@ -41,7 +41,7 @@ namespace LeonardoSpace
 		*/
 		void process(AudioSampleBuffer& buffer) override;
 
-		/** Handles events received by the processor
+				/** Handles events received by the processor
 
 		Called automatically for each received event whenever checkForEvents() is called from process()		
 		*/
@@ -56,15 +56,15 @@ namespace LeonardoSpace
 		/** The method that standard controls on the editor will call.
 		It is recommended that any variables used by the "process" function
 		are modified only through this method while data acquisition is active. */
-		//void setParameter(int parameterIndex, float newValue) override;
+		void setParameter(int parameterIndex, float newValue) override;
 
 		/** Saving custom settings to XML. */
-		//void saveCustomParametersToXml(XmlElement* parentElement) override;
-
+		void saveCustomChannelParametersToXml(XmlElement* channelInfo, int channelNumber, InfoObjectCommon::InfoObjectType channelTypel) override;
+		
 		/** Load custom settings from XML*/
-		//void loadCustomParametersFromXml() override;
+		void loadCustomChannelParametersFromXml(XmlElement* channelInfo, InfoObjectCommon::InfoObjectType channelType)  override;
 
-		/** Optional method called every time the signal chain is refreshed or changed in any way.
+	/** Optional method called every time the signal chain is refreshed or changed in any way.
 
 		Allows the processor to handle variations in the channel configuration or any other parameter
 		passed down the signal chain. The processor can also modify here the settings structure, which contains
@@ -72,8 +72,35 @@ namespace LeonardoSpace
 		structure shouldn't be manipulated outside of this method.
 
 		*/
-		//void updateSettings() override;
+		void updateSettings() override;
 
+		double getStartTimeValueForChannel  (int chan) const;
+		double getEndTimeValueForChannel (int chan) const;
+		double getDiffScaleValueForChannel(int chan) const;
+		
+
+		void setDiff(bool state);
+		bool applyDiff;
+
+	private:
+
+		Array<double> startTime; //1 por ch
+		Array<double> endTime;	//1 por ch
+		Array<double> diffScale; //1 por ch
+
+		double defaultStartTime;
+		double defaultEndTime;
+		double defaultDiffScale;
+
+		Array<bool> shouldDiffChannel;
+		
+		int time;
+		void setTime(int t);
+		int getTime();
+
+		// void setFilterParameters (double, double, double, int);
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Leonardo);
 	};
 }
 
