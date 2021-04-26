@@ -1,19 +1,21 @@
-#include "ProcessorPlugin.h"
+#include <stdio.h>
+#include <iostream>
+#include "Leonardo.h"
 
-using namespace ProcessorPluginSpace;
+using namespace LeonardoSpace;
 
 //Change all names for the relevant ones, including "Processor Name"
-ProcessorPlugin::ProcessorPlugin() : GenericProcessor("Processor Name")
+Leonardo::Leonardo() : GenericProcessor("EP detection")
+{
+	setProcessorType(PROCESSOR_TYPE_FILTER);
+}
+
+Leonardo::~Leonardo()
 {
 
 }
 
-ProcessorPlugin::~ProcessorPlugin()
-{
-
-}
-
-void ProcessorPlugin::process(AudioSampleBuffer& buffer)
+void Leonardo::process(AudioSampleBuffer& buffer)
 {
 	/** 
 	If the processor needs to handle events, this method must be called onyl once per process call
@@ -26,9 +28,11 @@ void ProcessorPlugin::process(AudioSampleBuffer& buffer)
 	{
 		int numSamples = getNumSamples(chan);
 		int64 timestamp = getTimestamp(chan);
+		float* bufPtr = buffer.getWritePointer(chan);
 
-		//Do whatever processing needed
+		for (int n = 0; n < numSamples; ++n)  
+      *(bufPtr + n) = n;
 	}
-	 
+
 }
 

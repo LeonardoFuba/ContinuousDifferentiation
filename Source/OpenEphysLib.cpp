@@ -21,9 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <PluginInfo.h>
-#include "ProcessorPlugin.h"
+#include "Leonardo.h"
 #include <string>
-
 #ifdef WIN32
 #include <Windows.h>
 #define EXPORT __declspec(dllexport)
@@ -31,20 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define EXPORT __attribute__((visibility("default")))
 #endif
 
-using namespace Plugin;
+using namespace LeonardoSpace;
 //Number of plugins defined on the library. Can be of different types (Processors, RecordEngines, etc...)
 #define NUM_PLUGINS 1
 
 extern "C" EXPORT void getLibInfo(Plugin::LibraryInfo* info)
 {
-	/* API version, defined by the GUI source.
+		/* API version, defined by the GUI source.
 	Should not be changed to ensure it is always equal to the one used in the latest codebase.
 	The GUI refueses to load plugins with mismatched API versions */
 	info->apiVersion = PLUGIN_API_VER;
-
+	
 	//Name of the Library, used only for information
-	info->name = "PLUGINLIBRARYNAME";
-
+	info->name = "Leonardo";
+	
 	//Version of the library, used only for information
 	info->libVersion = 1;
 	info->numPlugins = NUM_PLUGINS;
@@ -57,16 +56,16 @@ extern "C" EXPORT int getPluginInfo(int index, Plugin::PluginInfo* info)
 		//one case per plugin. This example is for a processor which connects directly to the signal chain
 	case 0:
 		//Type of plugin. See "Source/Processors/PluginManager/OpenEphysPlugin.h" for complete info about the different type structures
-		info->type = PluginType::PLUGIN_TYPE_PROCESSOR;
+		info->type = Plugin::PLUGIN_TYPE_PROCESSOR;
 
-		//Processor name
-		info->processor.name = "PLUGINGUINAME"; //Processor name shown in the GUI
+			//Processor name
+		info->processor.name = "EP detection"; //Processor name shown in the GUI
 
 		//Type of processor. Can be FilterProcessor, SourceProcessor, SinkProcessor or UtilityProcessor. Specifies where on the processor list will appear
-		info->processor.type = ProcessorType::FilterProcessor;
+		info->processor.type = Plugin::FilterProcessor;
 
 		//Class factory pointer. Replace "ProcessorPluginSpace::ProcessorPlugin" with the namespace and class name.
-		info->processor.creator = &(Plugin::createProcessor<ProcessorPluginSpace::ProcessorPlugin>);
+		info->processor.creator = &(Plugin::createProcessor<LeonardoSpace::Leonardo>);
 		break;
 		/**
 		Examples for other plugin types

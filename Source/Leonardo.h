@@ -1,23 +1,27 @@
 //This prevents include loops. We recommend changing the macro to a name suitable for your plugin
-#ifndef PROCESSORPLUGIN_H_DEFINED
-#define PROCESSORPLUGIN_H_DEFINED
+#ifndef LEONARDO_H_DEFINED
+#define LEONARDO_H_DEFINED
+
+#ifdef _WIN32
+    #include <Windows.h>
+#endif
 
 #include <ProcessorHeaders.h>
 
 //namespace must be an unique name for your plugin
-namespace ProcessorPluginSpace
+namespace LeonardoSpace
 {
-	class ProcessorPlugin : public GenericProcessor
+	class Leonardo : public GenericProcessor
 	{
 	public:
 		/** The class constructor, used to initialize any members. */
-		ProcessorPlugin();
+		Leonardo();
 
 		/** The class destructor, used to deallocate memory */
-		~ProcessorPlugin();
+		~Leonardo();
 
 		/** Indicates if the processor has a custom editor. Defaults to false */
-		//bool hasEditor() const { return true; }
+		bool hasEditor() const override { return false; }
 
 		/** If the processor has a custom editor, this method must be defined to instantiate it. */
 		//AudioProcessorEditor* createEditor() override;
