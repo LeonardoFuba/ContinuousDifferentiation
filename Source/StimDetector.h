@@ -80,6 +80,7 @@ namespace StimDetectorSpace {
             int samplesSinceTrigger;
 
             float lastSample;
+            float lastDiff;
 
             bool isActive;
             bool wasTriggered;

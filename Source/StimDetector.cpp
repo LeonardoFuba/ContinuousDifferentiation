@@ -23,19 +23,20 @@
 #include <stdio.h>
 #include "StimDetector.h"
 #include "StimDetectorEditor.h"
+#include <math.h>
 
 using namespace StimDetectorSpace;
 
 StimDetector::StimDetector()
     : GenericProcessor      ("Stim Detector")
     , activeModule          (-1)
-    , risingPos             (false)
+    , risingPos             (true)
     , risingNeg             (false)
     , fallingPos            (false)
     , fallingNeg            (false)
 {
     setProcessorType (PROCESSOR_TYPE_FILTER);
-	lastNumInputs = 0;
+	lastNumInputs = 1;
 }
 
 
@@ -61,6 +62,8 @@ void StimDetector::addModule()
     m.gateChan = -1;
     m.isActive = true;
     m.lastSample = 0.0f;
+    m.lastDiff = 0.0f;
+
     m.type = NONE;
     m.samplesSinceTrigger = 5000;
     m.wasTriggered = false;
@@ -82,33 +85,8 @@ void StimDetector::setParameter (int parameterIndex, float newValue)
 
     if (parameterIndex == 1) // module type
     {
-        int val = (int) newValue;
-
-        switch (val)
-        {
-            case 0:
-                module.type = NONE;
-                break;
-
-            case 1:
-                module.type = PEAK;
-                break;
-
-            case 2:
-                module.type = FALLING_ZERO;
-                break;
-
-            case 3:
-                module.type = TROUGH;
-                break;
-
-            case 4:
-                module.type = RISING_ZERO;
-                break;
-
-            default:
-                module.type = NONE;
-        }
+       // int val = (int) newValue;
+        module.type = PEAK;
     }
     else if (parameterIndex == 2)   // inputChan
     {
@@ -157,9 +135,9 @@ void StimDetector::updateSettings()
 		switch (modules[i].type)
 		{
 		case PEAK: typeDesc = "Positive peak"; identifier += "peak.positve";  break;
-		case FALLING_ZERO: typeDesc = "Zero crossing with negative slope"; identifier += "zero.negative";  break;
-		case TROUGH: typeDesc = "Negative peak"; identifier += "peak.negative"; break;
-		case RISING_ZERO: typeDesc = "Zero crossing with positive slope"; identifier += "zero.positive"; break;
+		//case FALLING_ZERO: typeDesc = "Zero crossing with negative slope"; identifier += "zero.negative";  break;
+		//case TROUGH: typeDesc = "Negative peak"; identifier += "peak.negative"; break;
+		//case RISING_ZERO: typeDesc = "Zero crossing with positive slope"; identifier += "zero.positive"; break;
 		default: typeDesc = "No phase selected"; break;
 		}
 		ev->setIdentifier(identifier);
@@ -240,67 +218,31 @@ void StimDetector::process (AudioSampleBuffer& buffer)
             for (int i = 0; i < getNumSamples (module.inputChan); ++i)
             {
                 const float sample = *buffer.getReadPointer (module.inputChan, i);
+                const float diffSample = abs(sample - module.lastSample);
 
-                if (sample < module.lastSample
-                    && sample > 0
+                if (diffSample > module.lastDiff
+                    && diffSample > 150
                     && module.phase != FALLING_POS)
                 {
-                    if (module.type == PEAK)
-                    {
-						uint8 ttlData = 1 << module.outputChan;
-						TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-						addEvent(moduleEventChannels[m], event, i);
-                        module.samplesSinceTrigger = 0;
-                        module.wasTriggered = true;
-                    }
+
+
+                    uint8 ttlData = 1 << module.outputChan;
+                    TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
+                    addEvent(moduleEventChannels[m], event, i);
+                    module.samplesSinceTrigger = 0;
+                    module.wasTriggered = true;
 
                     module.phase = FALLING_POS;
                 }
-                else if (sample < 0
-                         && module.lastSample >= 0
-                         && module.phase != FALLING_NEG)
-                {
-                    if (module.type == FALLING_ZERO)
+                 else
                     {
-						uint8 ttlData = 1 << module.outputChan;
-						TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-						addEvent(moduleEventChannels[m], event, i);
-                        module.samplesSinceTrigger = 0;
-                        module.wasTriggered = true;
+                        module.phase = NO_PHASE;
                     }
-
-                    module.phase = FALLING_NEG;
-                }
-                else if (sample > module.lastSample && sample < 0 && module.phase != RISING_NEG)
-                {
-                    if (module.type == TROUGH)
-                    {
-						uint8 ttlData = 1 << module.outputChan;
-						TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-						addEvent(moduleEventChannels[m], event, i);
-                        module.samplesSinceTrigger = 0;
-                        module.wasTriggered = true;
-                    }
-
-                    module.phase = RISING_NEG;
-                }
-                else if (sample > 0
-                         && module.lastSample <= 0
-                         && module.phase != RISING_POS)
-                {
-                    if (module.type == RISING_ZERO)
-                    {
-						uint8 ttlData = 1 << module.outputChan;
-						TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-						addEvent(moduleEventChannels[m], event, i);
-                        module.samplesSinceTrigger = 0;
-                        module.wasTriggered = true;
-                    }
-
-                    module.phase = RISING_POS;
-                }
+                
+                
 
                 module.lastSample = sample;
+                module.lastDiff = diffSample;
 
                 if (module.wasTriggered)
                 {

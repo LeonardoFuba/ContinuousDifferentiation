@@ -99,6 +99,7 @@ void StimDetectorEditor::stopAcquisition()
 	for (int i = 0; i < interfaces.size(); i++)
 		interfaces[i]->setEnableStatus(true);
 }
+
 void StimDetectorEditor::updateSettings()
 {
 
@@ -185,7 +186,7 @@ void StimDetectorEditor::saveCustomParameters(XmlElement* xml)
     for (int i = 0; i < interfaces.size(); i++)
     {
         XmlElement* d = xml->createNewChildElement("DETECTOR");
-        d->setAttribute("PHASE",interfaces[i]->getPhase());
+        //d->setAttribute("PHASE",interfaces[i]->getPhase());
         d->setAttribute("INPUT",interfaces[i]->getInputChan());
         d->setAttribute("GATE",interfaces[i]->getGateChan());
         d->setAttribute("OUTPUT",interfaces[i]->getOutputChan());
@@ -207,7 +208,7 @@ void StimDetectorEditor::loadCustomParameters(XmlElement* xml)
                 addDetector();
             }
 
-            interfaces[i]->setPhase(xmlNode->getIntAttribute("PHASE"));
+            //interfaces[i]->setPhase(xmlNode->getIntAttribute("PHASE"));
             interfaces[i]->setInputChan(xmlNode->getIntAttribute("INPUT"));
             interfaces[i]->setGateChan(xmlNode->getIntAttribute("GATE"));
             interfaces[i]->setOutputChan(xmlNode->getIntAttribute("OUTPUT"));
@@ -228,32 +229,32 @@ DetectorInterface::DetectorInterface(StimDetector* pd, Colour c, int id) :
 
     const double PI = 3.14159265;
 
-    sineWave.startNewSubPath(5,35);
+    //sineWave.startNewSubPath(5,35);
 
-    std::cout << "Creating sine wave" << std::endl;
+    //std::cout << "Creating sine wave" << std::endl;
 
-    for (double i = 0; i < 2*PI; i += PI/10)
-    {
-        sineWave.lineTo(i*12 + 5.0f, -sin(i)*20 + 35);
-    }
+    //for (double i = 0; i < 2*PI; i += PI/10)
+    //{
+     //   sineWave.lineTo(i*12 + 5.0f, -sin(i)*20 + 35);
+    //}
 
-    sineWave.addEllipse(2,35,4,4);
+    //sineWave.addEllipse(2,35,4,4);
 
-    std::cout << "Creating phase buttons" << std::endl;
+    //std::cout << "Creating phase buttons" << std::endl;
 
-    /*for (int phase = 0; phase < 4; phase++)
-    {
-        ElectrodeButton* phaseButton = new ElectrodeButton(-1);
+    //for (int phase = 0; phase < 4; phase++)
+    //{
+    //    ElectrodeButton* phaseButton = new ElectrodeButton(-1);
 
-        double theta = PI/2+phase*PI/2;
+    //    double theta = PI/2+phase*PI/2;
 
-        phaseButton->setBounds(theta*12+1.0f, -sin(theta)*20 + 31, 8, 8);
-        phaseButton->setToggleState(false, dontSendNotification);
-        phaseButton->setRadioGroupId(12);
-        phaseButton->addListener(this);
-        phaseButtons.add(phaseButton);
-        addAndMakeVisible(phaseButton);
-    }*/
+    //    phaseButton->setBounds(theta*12+1.0f, -sin(theta)*20 + 31, 8, 8);
+    //    phaseButton->setToggleState(false, dontSendNotification);
+    //    phaseButton->setRadioGroupId(12);
+    //    phaseButton->addListener(this);
+    //    phaseButtons.add(phaseButton);
+    //    addAndMakeVisible(phaseButton);
+    //}
 
     std::cout << "Creating combo boxes" << std::endl;
 
@@ -367,7 +368,7 @@ void DetectorInterface::updateChannels(int numChannels)
 void DetectorInterface::paint(Graphics& g)
 {
     g.setColour(backgroundColour);
-    g.strokePath(sineWave, PathStrokeType(3.0f));
+    //g.strokePath(sineWave, PathStrokeType(3.0f));
 
     g.setColour(Colours::darkgrey);
     g.setFont(font);
@@ -380,7 +381,7 @@ void DetectorInterface::paint(Graphics& g)
 int DetectorInterface::getPhase()
 {
 
-   /* for (int i = 0; i < phaseButtons.size(); i++)
+    /* for (int i = 0; i < phaseButtons.size(); i++)
     {
         if (phaseButtons[i]->getToggleState())
         {
@@ -394,14 +395,14 @@ int DetectorInterface::getPhase()
 void DetectorInterface::setPhase(int p)
 {
 
-    /*if (p >= 0)
+   /* if (p >= 0)
         phaseButtons[p]->setToggleState(true, dontSendNotification);*/
 
 
-    processor->setActiveModule(idNum);
+   processor->setActiveModule(idNum);
 
-    processor->setParameter(1, (float) p+1);
-
+   processor->setParameter(1, (float)p + 1);
+   
 }
 
 void DetectorInterface::setInputChan(int chan)
@@ -439,9 +440,10 @@ int DetectorInterface::getGateChan()
 {
     return gateSelector->getSelectedId()-2;
 }
+
 void DetectorInterface::setEnableStatus(bool status)
 {
-	/*inputSelector->setEnabled(status);
-	for (int i = 0; i < phaseButtons.size(); i++)
-		phaseButtons[i]->setEnabled(status);*/
+	inputSelector->setEnabled(status);
+	//*for (int i = 0; i < phaseButtons.size(); i++)
+		//phaseButtons[i]->setEnabled(status);*/
 }

@@ -33,104 +33,104 @@ namespace StimDetectorSpace {
     class StimDetector;
     //class ElectrodeButton;
 
-    /**
+/**
 
-    User interface for the StimDetector processor.
+  User interface for the StimDetector processor.
 
-    @see StimDetector
+  @see StimDetector
 
-    */
+*/
 
-    class StimDetectorEditor : public GenericEditor,
-        public ComboBox::Listener
-    {
-    public:
-        StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
+class StimDetectorEditor : public GenericEditor,
+    public ComboBox::Listener
+{
+public:
+    StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
 
-        virtual ~StimDetectorEditor();
+    virtual ~StimDetectorEditor();
 
-        void buttonEvent(Button* button);
+    void buttonEvent(Button* button);
 
-        void comboBoxChanged(ComboBox* c);
+    void comboBoxChanged(ComboBox* c);
 
-        void updateSettings();
+    void updateSettings();
 
-        void saveCustomParameters(XmlElement* xml);
-        void loadCustomParameters(XmlElement* xml);
+    void saveCustomParameters(XmlElement* xml);
+    void loadCustomParameters(XmlElement* xml);
 
-        void startAcquisition() override;
-        void stopAcquisition() override;
+	void startAcquisition() override;
+	void stopAcquisition() override;
 
-    private:
+private:
 
-        ScopedPointer<ComboBox> detectorSelector;
+    ScopedPointer<ComboBox> detectorSelector;
 
-        ScopedPointer<UtilityButton> plusButton;
+    ScopedPointer<UtilityButton> plusButton;
 
-        void addDetector();
+    void addDetector();
 
-        // ScopedPointer<ComboBox> inputChannelSelectionBox;
-        // ScopedPointer<ComboBox> outputChannelSelectionBox;
+    // ScopedPointer<ComboBox> inputChannelSelectionBox;
+    // ScopedPointer<ComboBox> outputChannelSelectionBox;
 
-        // ScopedPointer<Label> intputChannelLabel;
-        // ScopedPointer<Label> outputChannelLabel;
+    // ScopedPointer<Label> intputChannelLabel;
+    // ScopedPointer<Label> outputChannelLabel;
 
-        OwnedArray<DetectorInterface> interfaces;
+    OwnedArray<DetectorInterface> interfaces;
 
-        int previousChannelCount;
+    int previousChannelCount;
 
-        Array<Colour> backgroundColours;
+    Array<Colour> backgroundColours;
 
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorEditor);
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorEditor);
 
-    };
+};
 
-    class DetectorInterface :
-        public Component,
-        public ComboBox::Listener,
-        public Button::Listener
-    {
-    public:
-        DetectorInterface(StimDetector*, Colour, int);
-        ~DetectorInterface();
+class DetectorInterface :
+    public Component,
+    public ComboBox::Listener,
+    public Button::Listener
+{
+public:
+    DetectorInterface(StimDetector*, Colour, int);
+    ~DetectorInterface();
 
-        void paint(Graphics& g);
+    void paint(Graphics& g);
 
-        void comboBoxChanged(ComboBox*);
-        void buttonClicked(Button*);
+    void comboBoxChanged(ComboBox*);
+    void buttonClicked(Button*);
 
-        void updateChannels(int);
+    void updateChannels(int);
 
-        void setPhase(int);
-        void setInputChan(int);
-        void setOutputChan(int);
-        void setGateChan(int);
+    void setPhase(int);
+    void setInputChan(int);
+    void setOutputChan(int);
+    void setGateChan(int);
 
-        int getPhase();
-        int getInputChan();
-        int getOutputChan();
-        int getGateChan();
+    int getPhase();
+    int getInputChan();
+    int getOutputChan();
+    int getGateChan();
 
-        void setEnableStatus(bool status);
+	void setEnableStatus(bool status);
 
-    private:
+private:
 
-        Colour backgroundColour;
+    Colour backgroundColour;
 
-        Path sineWave;
-        Font font;
+    //Path sineWave;
+    Font font;
 
-        int idNum;
+    int idNum;
 
-        StimDetector* processor;
+    StimDetector* processor;
 
-        //OwnedArray<ElectrodeButton> phaseButtons;
+    //OwnedArray<ElectrodeButton> phaseButtons;
 
-        ScopedPointer<ComboBox> inputSelector;
-        ScopedPointer<ComboBox> gateSelector;
-        ScopedPointer<ComboBox> outputSelector;
+    ScopedPointer<ComboBox> inputSelector;
+    ScopedPointer<ComboBox> gateSelector;
+    ScopedPointer<ComboBox> outputSelector;
 
-    };
+};
 
 }
 
