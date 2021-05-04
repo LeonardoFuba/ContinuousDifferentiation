@@ -34,6 +34,7 @@ StimDetector::StimDetector()
     , risingNeg             (false)
     , fallingPos            (false)
     , fallingNeg            (false)
+    , defaultThreshold      (500.0f)
 {
     setProcessorType (PROCESSOR_TYPE_FILTER);
 	lastNumInputs = 1;
@@ -48,7 +49,8 @@ StimDetector::~StimDetector()
 AudioProcessorEditor* StimDetector::createEditor()
 {
     editor = new StimDetectorEditor (this, true);
-
+    StimDetectorEditor* ed = (StimDetectorEditor*) getEditor();
+    ed->setDefaults(defaultThreshold);
     std::cout << "Creating editor." << std::endl;
 
     return editor;
@@ -72,6 +74,11 @@ void StimDetector::addModule()
     modules.add (m);
 }
 
+
+double StimDetector::getThresholdValueForChannel (int chan)
+{
+    return thresholds[chan];
+}
 
 void StimDetector::setActiveModule (int i)
 {
@@ -108,6 +115,15 @@ void StimDetector::setParameter (int parameterIndex, float newValue)
             module.isActive = false;
         }
     }
+    else if(parameterIndex == 5) // threshold
+    {
+        if (newValue <= 0.01 || newValue >= 10000.0f)
+            return;
+            
+        thresholds.set (currentChannel,newValue);
+        editor->updateParameterButtons (parameterIndex);
+    }
+
 }
 
 //Usually, to be more ordered, we'd create the event channels overriding the createEventChannels() method.
@@ -116,6 +132,30 @@ void StimDetector::setParameter (int parameterIndex, float newValue)
 //we think it's better to do all in this method, that gets always called after all the create*Channels.
 void StimDetector::updateSettings()
 {
+    int numInputs = getNumInputs();
+    if (numInputs < 1024)
+    {
+        Array<double> oldThresholds;
+        oldThresholds = thresholds;
+        thresholds.clear();
+
+        for (int n = 0; n < getNumInputs(); ++n)
+        {
+            float newThreshold = 0.0f;
+
+            if (oldThresholds.size() > n)
+            {
+                newThreshold = oldThresholds[n];
+            }
+            else
+            {
+                newThreshold = defaultThreshold;
+            }
+
+            thresholds.add  (newThreshold);
+        }
+    }
+
 	moduleEventChannels.clear();
 	for (int i = 0; i < modules.size(); i++)
 	{
@@ -221,7 +261,7 @@ void StimDetector::process (AudioSampleBuffer& buffer)
                 const float diffSample = abs(sample - module.lastSample);
 
                 if (diffSample > module.lastDiff
-                    && diffSample > 150
+                    && diffSample > thresholds[module.inputChan]
                     && module.phase != FALLING_POS)
                 {
 
@@ -264,7 +304,36 @@ void StimDetector::process (AudioSampleBuffer& buffer)
 }
 
 
-void StimDetector::estimateFrequency()
+void StimDetector::saveCustomChannelParametersToXml(XmlElement* channelInfo, int channelNumber, InfoObjectCommon::InfoObjectType channelType)
 {
+    if (channelType == InfoObjectCommon::DATA_CHANNEL
+        && channelNumber > -1
+        && channelNumber < thresholds.size())
+    {
+        // std::cout << "Saving custom parameters for filter node." << std::endl;
+
+        XmlElement* channelParams = channelInfo->createNewChildElement ("PARAMETERS");
+        channelParams->setAttribute ("threshold", thresholds[channelNumber]);
+    }
 }
 
+
+void StimDetector::loadCustomChannelParametersFromXml(XmlElement* channelInfo, InfoObjectCommon::InfoObjectType channelType)
+{
+    int channelNum = channelInfo->getIntAttribute ("number");
+
+    if (channelType == InfoObjectCommon::DATA_CHANNEL)
+    {
+        // restore high and low cut text in case they were changed by channelChanged
+        static_cast<StimDetectorEditor*>(getEditor())->resetToSavedText();
+
+        forEachXmlChildElement (*channelInfo, subNode)
+        {
+            if (subNode->hasTagName ("PARAMETERS"))
+            {
+                thresholds.set (channelNum, subNode->getDoubleAttribute ("threshold", defaultThreshold));
+                
+            }
+        }
+    }
+}

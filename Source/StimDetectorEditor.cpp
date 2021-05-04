@@ -31,41 +31,38 @@
 using namespace StimDetectorSpace;
 
 StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors=true)
-    : GenericEditor(parentNode, useDefaultParameterEditors), previousChannelCount(-1)
+    : GenericEditor(parentNode, useDefaultParameterEditors)
+    , previousChannelCount(-1)
 
 {
-    desiredWidth = 220;
+    desiredWidth = 320;
+    lastThresholdString = " ";
 
-    // intputChannelLabel = new Label("input", "Input channel:");
-    // intputChannelLabel->setBounds(15,25,180,20);
-    // intputChannelLabel->setFont(Font("Small Text", 12, Font::plain));
-    // intputChannelLabel->setColour(Label::textColourId, Colours::darkgrey);
-    // addAndMakeVisible(intputChannelLabel);
+    thresholdLabel = new Label("threshold label", "Threshold (uV)");
+    thresholdLabel->setBounds(210,35,100,20);
+    thresholdLabel->setFont(Font("Small Text", 12, Font::plain));
+    thresholdLabel->setColour(Label::textColourId, Colours::darkgrey);
+    addAndMakeVisible(thresholdLabel);
 
-    // outputChannelLabel = new Label("output", "Output channel:");
-    // outputChannelLabel->setBounds(15,75,180,20);
-    // outputChannelLabel->setFont(Font("Small Text", 12, Font::plain));
-    // outputChannelLabel->setColour(Label::textColourId, Colours::darkgrey);
-    // addAndMakeVisible(outputChannelLabel);
-
-    // inputChannelSelectionBox = new ComboBox();
-    // inputChannelSelectionBox->setBounds(15,45,150,25);
-    // inputChannelSelectionBox->addListener(this);
-    // inputChannelSelectionBox->addItem("None", 1);
-    // inputChannelSelectionBox->setSelectedId(1, false);
-    // addAndMakeVisible(inputChannelSelectionBox);
+    thresholdValue = new Label("threshold value", lastThresholdString);
+    thresholdValue->setBounds(215,52,60,18);
+    thresholdValue->setFont(Font("Default", 15, Font::plain));
+    thresholdValue->setColour(Label::textColourId, Colours::white);
+    thresholdValue->setColour(Label::backgroundColourId, Colours::grey);
+    thresholdValue->setEditable(true);
+    thresholdValue->addListener(this);
+    thresholdValue->setTooltip("Set the threshold of detection");
+    addAndMakeVisible(thresholdValue);
 
     detectorSelector = new ComboBox();
     detectorSelector->setBounds(35,30,150,20);
-    detectorSelector->addListener(this);
-
+    //detectorSelector->addListener(this);
     addAndMakeVisible(detectorSelector);
 
     plusButton = new UtilityButton("+", titleFont);
     plusButton->addListener(this);
     plusButton->setRadius(3.0f);
     plusButton->setBounds(10,30,20,20);
-
     addAndMakeVisible(plusButton);
 
     backgroundColours.add(Colours::green);
@@ -83,7 +80,18 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
 
 StimDetectorEditor::~StimDetectorEditor()
 {
+}
 
+void StimDetectorEditor::setDefaults( double threshold)
+{
+    lastThresholdString = String(roundFloatToInt(threshold));
+
+    resetToSavedText();
+}
+
+void StimDetectorEditor::resetToSavedText()
+{
+    thresholdValue->setText(lastThresholdString, dontSendNotification);
 }
 
 void StimDetectorEditor::startAcquisition()
@@ -98,6 +106,47 @@ void StimDetectorEditor::stopAcquisition()
 	plusButton->setEnabled(true);
 	for (int i = 0; i < interfaces.size(); i++)
 		interfaces[i]->setEnableStatus(true);
+}
+
+void StimDetectorEditor::labelTextChanged(Label* label)
+{
+    StimDetector* fn = (StimDetector*) getProcessor();
+
+    Value val = label->getTextValue();
+    double requestedValue = double(val.getValue());
+
+    std::cout << requestedValue << std::endl;
+
+    if (requestedValue < 0.01 || requestedValue > 10000)
+    {
+        CoreServices::sendStatusMessage("Value out of range.");
+
+        if (label == thresholdValue) {
+
+            label->setText(lastThresholdString, dontSendNotification);
+            lastThresholdString = label->getText();
+        }
+        return;
+    }
+
+    Array<int> chans = getActiveChannels();
+
+    for (int n = 0; n < chans.size(); n++)
+    {
+
+        if (label == thresholdValue)
+        {
+            double val = fn->getThresholdValueForChannel(chans[n]);
+
+            if (requestedValue != val)
+            {
+                fn->setCurrentChannel(chans[n]);
+                fn->setParameter(5, requestedValue);
+            }
+
+            lastThresholdString = label->getText();
+        }
+    }
 }
 
 void StimDetectorEditor::updateSettings()
@@ -178,18 +227,26 @@ void StimDetectorEditor::addDetector()
 
 }
 
+void StimDetectorEditor::channelChanged (int channel, bool /*newState*/)
+{
+    StimDetector* fn = (StimDetector*) getProcessor();
+    thresholdValue->setText (String (fn->getThresholdValueForChannel (channel)), dontSendNotification);
+}
+
 void StimDetectorEditor::saveCustomParameters(XmlElement* xml)
 {
 
     xml->setAttribute("Type", "StimDetectorEditor");
 
+    lastThresholdString = thresholdValue->getText();
+
     for (int i = 0; i < interfaces.size(); i++)
     {
         XmlElement* d = xml->createNewChildElement("DETECTOR");
-        //d->setAttribute("PHASE",interfaces[i]->getPhase());
         d->setAttribute("INPUT",interfaces[i]->getInputChan());
         d->setAttribute("GATE",interfaces[i]->getGateChan());
         d->setAttribute("OUTPUT",interfaces[i]->getOutputChan());
+        d->setAttribute("THRESHOLD", lastThresholdString);
     }
 }
 
@@ -212,7 +269,7 @@ void StimDetectorEditor::loadCustomParameters(XmlElement* xml)
             interfaces[i]->setInputChan(xmlNode->getIntAttribute("INPUT"));
             interfaces[i]->setGateChan(xmlNode->getIntAttribute("GATE"));
             interfaces[i]->setOutputChan(xmlNode->getIntAttribute("OUTPUT"));
-
+            lastThresholdString = xmlNode->getStringAttribute("THRESHOLD", lastThresholdString);
             i++;
         }
     }

@@ -57,10 +57,15 @@ namespace StimDetectorSpace {
         bool enable() override;
         void process (AudioSampleBuffer& buffer) override;
 
+        double getThresholdValueForChannel(int chan);
+
+        void saveCustomChannelParametersToXml(XmlElement* channelInfo, int channelNumber, InfoObjectCommon::InfoObjectType channelTypel) override;
+        void loadCustomChannelParametersFromXml(XmlElement* channelInfo, InfoObjectCommon::InfoObjectType channelType)  override;
+
     private:
         void handleEvent (const EventChannel* channelInfo, const MidiMessage& event, int sampleNum) override;
 
-        void estimateFrequency();
+        // void estimateFrequency();
 
         enum ModuleType
         {
@@ -98,6 +103,9 @@ namespace StimDetectorSpace {
         bool fallingPos;
         bool fallingNeg;
         int lastNumInputs;
+
+        Array<double> thresholds;
+        double defaultThreshold;
 
         Array<const EventChannel*> moduleEventChannels;
 

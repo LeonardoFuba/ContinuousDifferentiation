@@ -42,6 +42,7 @@ namespace StimDetectorSpace {
 */
 
 class StimDetectorEditor : public GenericEditor,
+    public Label::Listener,
     public ComboBox::Listener
 {
 public:
@@ -50,9 +51,14 @@ public:
     virtual ~StimDetectorEditor();
 
     void buttonEvent(Button* button);
-
+    
     void comboBoxChanged(ComboBox* c);
 
+    void labelTextChanged(Label* label);
+    void setDefaults(double threshold);
+    void resetToSavedText();
+    void channelChanged (int chan, bool newState);
+   
     void updateSettings();
 
     void saveCustomParameters(XmlElement* xml);
@@ -66,6 +72,10 @@ private:
     ScopedPointer<ComboBox> detectorSelector;
 
     ScopedPointer<UtilityButton> plusButton;
+
+    String lastThresholdString;
+    ScopedPointer<Label> thresholdLabel;
+    ScopedPointer<Label> thresholdValue;
 
     void addDetector();
 
