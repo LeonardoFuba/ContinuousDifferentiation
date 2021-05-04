@@ -25,13 +25,21 @@
 #ifndef __STIMDETECTOREDITOR_H_DEFINED
 #define __STIMDETECTOREDITOR_H_DEFINED
 
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <EditorHeaders.h>
+
 
 namespace StimDetectorSpace {
 
     class DetectorInterface;
     class StimDetector;
     //class ElectrodeButton;
+
+    // class FilterViewport;
 
 /**
 
@@ -51,7 +59,7 @@ public:
     virtual ~StimDetectorEditor();
 
     void buttonEvent(Button* button);
-    
+
     void comboBoxChanged(ComboBox* c);
 
     void labelTextChanged(Label* label);
@@ -70,8 +78,9 @@ public:
 private:
 
     ScopedPointer<ComboBox> detectorSelector;
-
+    
     ScopedPointer<UtilityButton> plusButton;
+    ScopedPointer<UtilityButton> applyDiff;
 
     String lastThresholdString;
     ScopedPointer<Label> thresholdLabel;
@@ -139,6 +148,7 @@ private:
     ScopedPointer<ComboBox> inputSelector;
     ScopedPointer<ComboBox> gateSelector;
     ScopedPointer<ComboBox> outputSelector;
+    ScopedPointer<UtilityButton> applyDiff;
 
 };
 

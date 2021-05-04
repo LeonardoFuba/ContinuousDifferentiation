@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <cmath>
+#include <iostream>
 
 using namespace StimDetectorSpace;
 
@@ -53,6 +54,13 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
     thresholdValue->addListener(this);
     thresholdValue->setTooltip("Set the threshold of detection");
     addAndMakeVisible(thresholdValue);
+
+    applyDiff = new UtilityButton("Diff", Font("Default", 10, Font::plain));
+    applyDiff->addListener(this);
+    applyDiff->setBounds(215, 80, 60, 18);; //(x,y,w,h)
+    applyDiff->setClickingTogglesState(true);
+    applyDiff->setTooltip("When this button is off, selected channels will do not show differentiation");
+    addAndMakeVisible(applyDiff);
 
     detectorSelector = new ComboBox();
     detectorSelector->setBounds(35,30,150,20);
@@ -186,12 +194,23 @@ void StimDetectorEditor::comboBoxChanged(ComboBox* c)
 
 void StimDetectorEditor::buttonEvent(Button* button)
 {
+        if (button == applyDiff)
+        {
+            StimDetector* fn = (StimDetector*)getProcessor();
+            fn->setDiff(applyDiff->getToggleState());
+
+        }
+        // else if (button == name)
+        // {
+
+        // }
+    /*
     if (button == plusButton && interfaces.size() < 5)
     {
 
         addDetector();
 		CoreServices::updateSignalChain(this);
-    }
+    }*/
 
 }
 
@@ -270,6 +289,7 @@ void StimDetectorEditor::loadCustomParameters(XmlElement* xml)
             interfaces[i]->setGateChan(xmlNode->getIntAttribute("GATE"));
             interfaces[i]->setOutputChan(xmlNode->getIntAttribute("OUTPUT"));
             lastThresholdString = xmlNode->getStringAttribute("THRESHOLD", lastThresholdString);
+            applyDiff->setToggleState(xmlNode->getBoolAttribute("applyDiff", false), sendNotification);
             i++;
         }
     }

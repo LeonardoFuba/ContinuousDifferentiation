@@ -38,6 +38,8 @@ StimDetector::StimDetector()
 {
     setProcessorType (PROCESSOR_TYPE_FILTER);
 	lastNumInputs = 1;
+    applyDiff = false;
+
 }
 
 
@@ -45,6 +47,11 @@ StimDetector::~StimDetector()
 {
 }
 
+
+void StimDetector::setDiff(bool state)
+{
+    applyDiff = state;
+};
 
 AudioProcessorEditor* StimDetector::createEditor()
 {
@@ -259,6 +266,10 @@ void StimDetector::process (AudioSampleBuffer& buffer)
             {
                 const float sample = *buffer.getReadPointer (module.inputChan, i);
                 const float diffSample = abs(sample - module.lastSample);
+                if (applyDiff)
+                { 
+                    *buffer.getWritePointer(module.inputChan, i) = diffSample;
+                }
 
                 if (diffSample > module.lastDiff
                     && diffSample > thresholds[module.inputChan]
@@ -286,7 +297,7 @@ void StimDetector::process (AudioSampleBuffer& buffer)
 
                 if (module.wasTriggered)
                 {
-                    if (module.samplesSinceTrigger > 1000)
+                    if (module.samplesSinceTrigger > 10)
                     {
 						uint8 ttlData = 0;
 						TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
