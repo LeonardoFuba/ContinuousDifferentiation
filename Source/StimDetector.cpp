@@ -112,15 +112,15 @@ void StimDetector::setParameter (int parameterIndex, float newValue)
     }
     else if (parameterIndex == 4)   // gateChan
     {
-        module.gateChan = (int) newValue;
-        if (module.gateChan < 0)
-        {
-            module.isActive = true;
-        }
-        else
-        {
-            module.isActive = false;
-        }
+        // module.gateChan = (int) newValue;
+        // if (module.gateChan < 0)
+        // {
+        //     module.isActive = true;
+        // }
+        // else
+        // {
+        //     module.isActive = false;
+        // }
     }
     else if(parameterIndex == 5) // threshold
     {

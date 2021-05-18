@@ -37,8 +37,6 @@ namespace StimDetectorSpace {
 
     class DetectorInterface;
     class StimDetector;
-    //class ElectrodeButton;
-
     // class FilterViewport;
 
 /**
@@ -59,14 +57,13 @@ public:
     virtual ~StimDetectorEditor();
 
     void buttonEvent(Button* button);
-
     void comboBoxChanged(ComboBox* c);
-
+  
     void labelTextChanged(Label* label);
     void setDefaults(double threshold);
     void resetToSavedText();
-    void channelChanged (int chan, bool newState);
-   
+    void channelChanged(int chan, bool newState);
+
     void updateSettings();
 
     void saveCustomParameters(XmlElement* xml);
@@ -81,7 +78,7 @@ private:
     
     ScopedPointer<UtilityButton> plusButton;
     ScopedPointer<UtilityButton> applyDiff;
-
+    
     String lastThresholdString;
     ScopedPointer<Label> thresholdLabel;
     ScopedPointer<Label> thresholdValue;
@@ -104,8 +101,7 @@ private:
 
 };
 
-class DetectorInterface :
-    public Component,
+class DetectorInterface : public Component,
     public ComboBox::Listener,
     public Button::Listener
 {
@@ -120,35 +116,25 @@ public:
 
     void updateChannels(int);
 
-    void setPhase(int);
     void setInputChan(int);
     void setOutputChan(int);
-    void setGateChan(int);
 
-    int getPhase();
     int getInputChan();
     int getOutputChan();
-    int getGateChan();
 
 	void setEnableStatus(bool status);
 
 private:
-
     Colour backgroundColour;
-
-    //Path sineWave;
     Font font;
 
     int idNum;
 
     StimDetector* processor;
 
-    //OwnedArray<ElectrodeButton> phaseButtons;
-
     ScopedPointer<ComboBox> inputSelector;
-    ScopedPointer<ComboBox> gateSelector;
     ScopedPointer<ComboBox> outputSelector;
-    ScopedPointer<UtilityButton> applyDiff;
+    
 
 };
 
