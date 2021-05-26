@@ -24,6 +24,7 @@
 #include "StimDetector.h"
 #include "StimDetectorEditor.h"
 #include <math.h>
+#include <iostream>
 
 using namespace StimDetectorSpace;
 
@@ -39,6 +40,12 @@ StimDetector::StimDetector()
     setProcessorType (PROCESSOR_TYPE_FILTER);
 	lastNumInputs = 1;
     applyDiff = false;
+    count = -1;
+
+    for (int i = 0; i < MEDIA_LENGTH; i++)
+    {
+        media[i] = 0;
+    }
 
 }
 
@@ -77,6 +84,9 @@ void StimDetector::addModule()
     m.samplesSinceTrigger = 5000;
     m.wasTriggered = false;
     m.phase = NO_PHASE;
+
+    m.startIndex = -1;
+    m.windowIndex = -1;
 
     modules.add (m);
 }
@@ -262,7 +272,9 @@ void StimDetector::process (AudioSampleBuffer& buffer)
             && module.inputChan >= 0
             && module.inputChan < buffer.getNumChannels())
         {
-            for (int i = 0; i < getNumSamples (module.inputChan); ++i)
+
+            int bufferLength = getNumSamples (module.inputChan);
+            for (int i = 0; i < bufferLength; ++i)
             {
                 const float sample = *buffer.getReadPointer (module.inputChan, i);
                 const float diffSample = abs(sample - module.lastSample);
@@ -284,14 +296,15 @@ void StimDetector::process (AudioSampleBuffer& buffer)
                     module.wasTriggered = true;
 
                     module.phase = FALLING_POS;
+                    module.startIndex = i;
+                    module.windowIndex = 0;
+                    count++;
                 }
-                 else
-                    {
-                        module.phase = NO_PHASE;
-                    }
+                else
+                {
+                    module.phase = NO_PHASE;
+                }
                 
-                
-
                 module.lastSample = sample;
                 module.lastDiff = diffSample;
 
@@ -309,6 +322,20 @@ void StimDetector::process (AudioSampleBuffer& buffer)
                         module.samplesSinceTrigger++;
                     }
                 }
+
+                // esta dentro da janela
+                if (module.startIndex >= 0 && module.windowIndex < MEDIA_LENGTH )
+                {
+                    media[module.windowIndex] = (media[module.windowIndex] * count + sample) / (double)(count + 1);
+                    std::cout << "count=;" << count << ";i="<<i<< ";media[" << module.windowIndex << "] ;" << media[module.windowIndex] << std::endl;
+                    module.windowIndex++;
+                }
+                else {
+                    // desativa referencias
+                    module.startIndex = -1;
+                    module.windowIndex = -1;
+                }
+
             }
         }
     }

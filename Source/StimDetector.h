@@ -31,7 +31,7 @@
 #include <ProcessorHeaders.h>
 
 #define NUM_INTERVALS 5
-
+#define MEDIA_LENGTH 500
 
 namespace StimDetectorSpace {
 
@@ -86,6 +86,8 @@ namespace StimDetectorSpace {
             int gateChan;
             int outputChan;
             int samplesSinceTrigger;
+            int startIndex;
+            int windowIndex;
 
             float lastSample;
             float lastDiff;
@@ -110,6 +112,9 @@ namespace StimDetectorSpace {
         Array<bool> shouldDiffChannel;
         Array<double> thresholds;
         double defaultThreshold;
+
+        int count;
+        double media[MEDIA_LENGTH];
 
         Array<const EventChannel*> moduleEventChannels;
 
