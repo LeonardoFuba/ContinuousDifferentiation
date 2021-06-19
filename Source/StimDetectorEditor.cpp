@@ -39,18 +39,30 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
     desiredWidth = 320;
     lastThresholdString = " ";
 
-    
+    std::cout << "Creating buttons" << std::endl;
+
+    plusButton = new UtilityButton("+", titleFont);
+    plusButton->addListener(this);
+    plusButton->setRadius(3.0f);
+    plusButton->setBounds(10, 30, 20, 20);
+    addAndMakeVisible(plusButton);
+
+    detectorSelector = new ComboBox();
+    detectorSelector->setBounds(35,30,165,20);
+    detectorSelector->addListener(this);
+    addAndMakeVisible(detectorSelector);
+
 
     std::cout << "Creating inputs" << std::endl;
 
     thresholdLabel = new Label("threshold label", "Threshold (uV)");
-    thresholdLabel->setBounds(210,35,100,20);
+    thresholdLabel->setBounds(210, 35, 100, 20);
     thresholdLabel->setFont(Font("Small Text", 12, Font::plain));
     thresholdLabel->setColour(Label::textColourId, Colours::darkgrey);
     addAndMakeVisible(thresholdLabel);
 
     thresholdValue = new Label("threshold value", lastThresholdString);
-    thresholdValue->setBounds(215,52,60,18);
+    thresholdValue->setBounds(215, 52, 60, 18);
     thresholdValue->setFont(Font("Default", 15, Font::plain));
     thresholdValue->setColour(Label::textColourId, Colours::white);
     thresholdValue->setColour(Label::backgroundColourId, Colours::grey);
@@ -59,24 +71,13 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
     thresholdValue->setTooltip("Set the threshold of detection");
     addAndMakeVisible(thresholdValue);
 
-    std::cout << "Creating buttons" << std::endl;
-
     applyDiff = new UtilityButton("Diff", Font("Default", 10, Font::plain));
     applyDiff->addListener(this);
     applyDiff->setBounds(215, 80, 60, 18);
     applyDiff->setClickingTogglesState(true);
     applyDiff->setTooltip("When this button is off, selected channels will do not show differentiation");
     addAndMakeVisible(applyDiff);
-    detectorSelector = new ComboBox();
-    detectorSelector->setBounds(35,30,150,20);
-    //detectorSelector->addListener(this);
-    addAndMakeVisible(detectorSelector);
 
-    plusButton = new UtilityButton("+", titleFont);
-    plusButton->addListener(this);
-    plusButton->setRadius(3.0f);
-    plusButton->setBounds(10,30,20,20);
-    addAndMakeVisible(plusButton);
 
     backgroundColours.add(Colours::red);
     //plusButton->setToggleState(true, sendNotification);
@@ -196,8 +197,8 @@ void StimDetectorEditor::buttonEvent(Button* button)
 {
     if (button == plusButton && interfaces.size() < 8)
     {
-        //addDetector();
-		//CoreServices::updateSignalChain(this);
+        addDetector();
+		CoreServices::updateSignalChain(this);
     }
 
     else if (button == applyDiff)
@@ -290,12 +291,11 @@ DetectorInterface::DetectorInterface(StimDetector* pd, Colour c, int id) :
     backgroundColour(c), idNum(id), processor(pd)
 {
 
-    // lastThresholdString = "500";
+    // lastThresholdString = " ";
 
     font = Font("Small Text", 10, Font::plain);
 
     std::cout << "Creating combo boxes" << std::endl;
-
 
     inputSelector = new ComboBox();
     inputSelector->setBounds(140,5,50,20);
@@ -303,6 +303,17 @@ DetectorInterface::DetectorInterface(StimDetector* pd, Colour c, int id) :
     inputSelector->setSelectedId(1, dontSendNotification);
     inputSelector->addListener(this);
     addAndMakeVisible(inputSelector);
+
+    gateSelector = new ComboBox();
+    gateSelector->setBounds(140, 30, 50, 20);
+    gateSelector->addItem("-", 1);
+    gateSelector->addListener(this);
+    for (int i = 1; i < 9; i++)
+    {
+        gateSelector->addItem(String(i), i + 1);
+    }
+    gateSelector->setSelectedId(1);
+    addAndMakeVisible(gateSelector);
 
     outputSelector = new ComboBox();
     outputSelector->setBounds(140,55,50,20);
@@ -348,10 +359,10 @@ void DetectorInterface::comboBoxChanged(ComboBox* c)
     {
         parameterIndex = 3;
     }
-    /* else if (c == gateSelector)
+    else if (c == gateSelector)
     {
         parameterIndex = 4;
-    }*/
+    }
     else {
         
     }
@@ -363,10 +374,10 @@ void DetectorInterface::comboBoxChanged(ComboBox* c)
 	}
 }
 
-void DetectorInterface::buttonClicked(Button* b)
-{
+//void DetectorInterface::buttonClicked(Button* b)
+//{
     /* processor->setActiveModule(idNum); */
-}
+//}
 
 void DetectorInterface::updateChannels(int numChannels)
 {
@@ -394,7 +405,7 @@ void DetectorInterface::paint(Graphics& g)
     g.setColour(Colours::darkgrey);
     g.setFont(font);
     g.drawText("INPUT",50,10,85,10,Justification::right, true);
-    //g.drawText("GATE",50,35,85,10,Justification::right, true);
+    g.drawText("GATE",50,35,85,10,Justification::right, true);
     g.drawText("OUTPUT",50,60,85,10,Justification::right, true);
 
 }
@@ -413,6 +424,13 @@ void DetectorInterface::setOutputChan(int chan)
     processor->setParameter(3, (float) chan);
 }
 
+void DetectorInterface::setGateChan(int chan)
+{
+    gateSelector->setSelectedId(chan + 2);
+
+    processor->setParameter(4, (float)chan);
+}
+
 int DetectorInterface::getInputChan()
 {
     return inputSelector->getSelectedId()-2;
@@ -421,6 +439,11 @@ int DetectorInterface::getInputChan()
 int DetectorInterface::getOutputChan()
 {
     return outputSelector->getSelectedId()-2;
+}
+
+int DetectorInterface::getGateChan()
+{
+    return gateSelector->getSelectedId() - 2;
 }
 
 void DetectorInterface::setEnableStatus(bool status)

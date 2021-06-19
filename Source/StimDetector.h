@@ -31,7 +31,7 @@
 #include <ProcessorHeaders.h>
 
 #define NUM_INTERVALS 5
-#define MEDIA_LENGTH 500
+#define AVG_LENGTH 400
 
 namespace StimDetectorSpace {
 
@@ -68,45 +68,42 @@ namespace StimDetectorSpace {
     private:
         void handleEvent (const EventChannel* channelInfo, const MidiMessage& event, int sampleNum) override;
 
-        // void estimateFrequency();
-
         enum ModuleType
         {
-            NONE, PEAK, FALLING_ZERO, TROUGH, RISING_ZERO
+            NONE, PEAK
         };
 
         enum PhaseType
         {
-            NO_PHASE, RISING_POS, FALLING_POS, FALLING_NEG, RISING_NEG
+            NO_PHASE, FALLING_POS
         };
-
         struct DetectorModule
         {
-            int inputChan;
-            int gateChan;
-            int outputChan;
-            int samplesSinceTrigger;
-            int startIndex;
-            int windowIndex;
+            int inputChan;              //electrode input channel
+            int gateChan;               //digital input channel
+            int outputChan;             //digital output channel
+            int samplesSinceTrigger;    //ttl interval count
 
-            float lastSample;
-            float lastDiff;
+            float lastSample;           //last input original data
+            float lastDiff;             //last input diff data
 
             bool isActive;
-            bool wasTriggered;
+            bool wasTriggered;          //ttl interval
+            bool startStim;             //stim interval
+            bool detectorStim;          //internal ttl detector
 
+            int startIndex;             //intput index
+            int windowIndex;            //avg index
+            int count;                  //avg count
+
+            //double threshold;
+            //double avg[AVG_LENGTH];
             ModuleType type;
             PhaseType phase;
         };
 
         Array<DetectorModule> modules;
-
         int activeModule;
-
-        bool risingPos;
-        bool risingNeg;
-        bool fallingPos;
-        bool fallingNeg;
         int lastNumInputs;
 
         Array<bool> shouldDiffChannel;
@@ -114,7 +111,7 @@ namespace StimDetectorSpace {
         double defaultThreshold;
 
         int count;
-        double media[MEDIA_LENGTH];
+        double media[AVG_LENGTH];
 
         Array<const EventChannel*> moduleEventChannels;
 

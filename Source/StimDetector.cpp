@@ -31,18 +31,14 @@ using namespace StimDetectorSpace;
 StimDetector::StimDetector()
     : GenericProcessor      ("Stim Detector")
     , activeModule          (-1)
-    , risingPos             (true)
-    , risingNeg             (false)
-    , fallingPos            (false)
-    , fallingNeg            (false)
-    , defaultThreshold      (500.0f)
+    , defaultThreshold      (100.0f)
 {
     setProcessorType (PROCESSOR_TYPE_FILTER);
 	lastNumInputs = 1;
     applyDiff = false;
     count = -1;
 
-    for (int i = 0; i < MEDIA_LENGTH; i++)
+    for (int i = 0; i < AVG_LENGTH; i++)
     {
         media[i] = 0;
     }
@@ -53,12 +49,6 @@ StimDetector::StimDetector()
 StimDetector::~StimDetector()
 {
 }
-
-
-void StimDetector::setDiff(bool state)
-{
-    applyDiff = state;
-};
 
 AudioProcessorEditor* StimDetector::createEditor()
 {
@@ -74,27 +64,23 @@ void StimDetector::addModule()
 {
     DetectorModule m = DetectorModule();
     m.inputChan = -1;
-    m.outputChan = -1;
     m.gateChan = -1;
-    m.isActive = true;
+    m.outputChan = -1;
+    m.samplesSinceTrigger = 5000;
     m.lastSample = 0.0f;
     m.lastDiff = 0.0f;
-
-    m.type = NONE;
-    m.samplesSinceTrigger = 5000;
+    m.isActive = true;
     m.wasTriggered = false;
-    m.phase = NO_PHASE;
-
+    m.startStim = false;
+    m.detectorStim = true;
     m.startIndex = -1;
     m.windowIndex = -1;
+    m.count = -1;
+
+    //for (int i = 0; i < AVG_LENGTH; i++)
+        //m.avg[i] = 0;
 
     modules.add (m);
-}
-
-
-double StimDetector::getThresholdValueForChannel (int chan)
-{
-    return thresholds[chan];
 }
 
 void StimDetector::setActiveModule (int i)
@@ -102,15 +88,13 @@ void StimDetector::setActiveModule (int i)
     activeModule = i;
 }
 
-
 void StimDetector::setParameter (int parameterIndex, float newValue)
 {
     DetectorModule& module = modules.getReference (activeModule);
 
-    if (parameterIndex == 1) // module type
+    if (parameterIndex == 1) // empty
     {
-       // int val = (int) newValue;
-        module.type = PEAK;
+
     }
     else if (parameterIndex == 2)   // inputChan
     {
@@ -122,15 +106,15 @@ void StimDetector::setParameter (int parameterIndex, float newValue)
     }
     else if (parameterIndex == 4)   // gateChan
     {
-        // module.gateChan = (int) newValue;
-        // if (module.gateChan < 0)
-        // {
-        //     module.isActive = true;
-        // }
-        // else
-        // {
-        //     module.isActive = false;
-        // }
+        module.gateChan = (int) newValue;
+        if (module.gateChan < 0)
+        {
+            module.detectorStim = true;
+        }
+        else
+        {
+            module.detectorStim = false;
+        }
     }
     else if(parameterIndex == 5) // threshold
     {
@@ -176,10 +160,14 @@ void StimDetector::updateSettings()
 	moduleEventChannels.clear();
 	for (int i = 0; i < modules.size(); i++)
 	{
-		if (getNumInputs() != lastNumInputs)
+  		if (getNumInputs() != lastNumInputs)
 			modules.getReference(i).inputChan = -1;
-		const DataChannel* in = getDataChannel(modules[i].inputChan);
+		
+        const DataChannel* in = getDataChannel(modules[i].inputChan);
 		EventChannel *ev;
+        String identifier = "dataderived.phase.peak.positve";
+        String typeDesc = "Positive peak";
+
 		if (in)
 			ev = new EventChannel(EventChannel::TTL, 8, 1, in, this);
 		else
@@ -187,16 +175,6 @@ void StimDetector::updateSettings()
 
 		ev->setName("Stim detector output " + String(i + 1));
 		ev->setDescription("Triggers when the input signal mets a given phase condition");
-		String identifier = "dataderived.phase.";
-		String typeDesc;
-		switch (modules[i].type)
-		{
-		case PEAK: typeDesc = "Positive peak"; identifier += "peak.positve";  break;
-		//case FALLING_ZERO: typeDesc = "Zero crossing with negative slope"; identifier += "zero.negative";  break;
-		//case TROUGH: typeDesc = "Negative peak"; identifier += "peak.negative"; break;
-		//case RISING_ZERO: typeDesc = "Zero crossing with positive slope"; identifier += "zero.positive"; break;
-		default: typeDesc = "No phase selected"; break;
-		}
 		ev->setIdentifier(identifier);
 		MetaDataDescriptor md(MetaDataDescriptor::CHAR, 34, "Stim Type", "Description of the phase condition", "channelInfo.extra");
 		MetaDataValue mv(md);
@@ -227,120 +205,145 @@ bool StimDetector::enable()
 }
 
 
-void StimDetector::handleEvent (const EventChannel* channelInfo, const MidiMessage& event, int sampleNum)
+void StimDetector::handleEvent(const EventChannel* channelInfo, const MidiMessage& event, int sampleNum)
 {
     // MOVED GATING TO PULSE PAL OUTPUT!
     // now use to randomize phase for next trial
 
     //std::cout << "GOT EVENT." << std::endl;
 
-    if (Event::getEventType(event)  == EventChannel::TTL)
+    if (Event::getEventType(event) == EventChannel::TTL)
     {
-		TTLEventPtr ttl = TTLEvent::deserializeFromMessage(event, channelInfo);
+        TTLEventPtr ttl = TTLEvent::deserializeFromMessage(event, channelInfo);
 
         // int eventNodeId = *(dataptr+1);
-		const int eventId = ttl->getState() ? 1 : 0;
-		const int eventChannel = ttl->getChannel();
+        const int eventId = ttl->getState() ? 1 : 0;
+        const int eventChannel = ttl->getChannel();
 
         for (int i = 0; i < modules.size(); ++i)
         {
-            DetectorModule& module = modules.getReference (i);
+            DetectorModule& module = modules.getReference(i);
 
             if (module.gateChan == eventChannel)
             {
                 if (eventId)
-                    module.isActive = true;
-                else
-                    module.isActive = false;
+                {
+                    module.startStim = true;
+                    module.detectorStim = false;
+                }
+                else {
+                    module.startStim = false;
+                }
             }
         }
     }
 }
 
 
-void StimDetector::process (AudioSampleBuffer& buffer)
+void StimDetector::process(AudioSampleBuffer& buffer)
 {
-    checkForEvents ();
+    checkForEvents();
 
     // loop through the modules
     for (int m = 0; m < modules.size(); ++m)
     {
-        DetectorModule& module = modules.getReference (m);
+        DetectorModule& module = modules.getReference(m);
 
         // check to see if it's active and has a channel
-        if (module.isActive && module.outputChan >= 0
+        if (module.outputChan >= 0
             && module.inputChan >= 0
             && module.inputChan < buffer.getNumChannels())
         {
-
-            int bufferLength = getNumSamples (module.inputChan);
+            int bufferLength = getNumSamples(module.inputChan);
             for (int i = 0; i < bufferLength; ++i)
             {
-                const float sample = *buffer.getReadPointer (module.inputChan, i);
-                const float diffSample = abs(sample - module.lastSample);
+                const float sample = *buffer.getReadPointer(module.inputChan, i);
+                const float diffSample = sample - module.lastSample;
                 if (applyDiff)
-                { 
+                {
                     *buffer.getWritePointer(module.inputChan, i) = diffSample;
                 }
 
-                if (diffSample > module.lastDiff
-                    && diffSample > thresholds[module.inputChan]
-                    && module.phase != FALLING_POS)
+                if (module.detectorStim)      //gate disableded
                 {
+                    if (diffSample > module.lastDiff                    //variacao brusca
+                        && diffSample > thresholds[module.inputChan]    //acima do limiar
+                        && !module.startStim)                           //fora do TTL
+                    {
+                        //inicia TTL
+                        uint8 ttlData = 1 << module.outputChan;
+                        TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
+                        addEvent(moduleEventChannels[m], event, i);
+                        module.samplesSinceTrigger = 0;
+                        module.wasTriggered = true;
+                        module.startStim = true;
 
+                        //config avg
+                        module.startIndex = i;
+                        module.windowIndex = 0;
+                        count++;
+                    }
+                    module.lastSample = sample;
+                    module.lastDiff = diffSample;
 
-                    uint8 ttlData = 1 << module.outputChan;
-                    TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-                    addEvent(moduleEventChannels[m], event, i);
-                    module.samplesSinceTrigger = 0;
-                    module.wasTriggered = true;
+                    //durante TTL
+                    if (module.wasTriggered)
+                    {
+                        //finalizacao do TTL
+                        if (module.samplesSinceTrigger > 10)
+                        {
+                            uint8 ttlData = 0;
+                            TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
+                            addEvent(moduleEventChannels[m], event, i);
+                            module.wasTriggered = false;
+                        }
+                        else
+                        {
+                            module.samplesSinceTrigger++;
+                        }
+                    }
+                }
 
-                    module.phase = FALLING_POS;
+                /* TTL gate enableded */
+                if (!module.detectorStim && module.startStim)
+                {
                     module.startIndex = i;
                     module.windowIndex = 0;
                     count++;
-                }
-                else
-                {
-                    module.phase = NO_PHASE;
-                }
-                
-                module.lastSample = sample;
-                module.lastDiff = diffSample;
-
-                if (module.wasTriggered)
-                {
-                    if (module.samplesSinceTrigger > 10)
-                    {
-						uint8 ttlData = 0;
-						TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-						addEvent(moduleEventChannels[m], event, i);
-                        module.wasTriggered = false;
-                    }
-                    else
-                    {
-                        module.samplesSinceTrigger++;
-                    }
+                    module.startStim = false;
                 }
 
                 // esta dentro da janela
-                if (module.startIndex >= 0 && module.windowIndex < MEDIA_LENGTH )
+                if (module.startIndex >= 0 && module.windowIndex < AVG_LENGTH)
                 {
                     media[module.windowIndex] = (media[module.windowIndex] * count + sample) / (double)(count + 1);
-                    std::cout << "count=;" << count << ";i="<<i<< ";media[" << module.windowIndex << "] ;" << media[module.windowIndex] << std::endl;
+                    //std::cout << "count=;" << count << ";i="<<i<< ";media[" << module.windowIndex << "] ;" << media[module.windowIndex] << std::endl;
                     module.windowIndex++;
+
+                    //output
+                    //*buffer.getWritePointer(module.inputChan, i) = module.avg[module.windowIndex];
                 }
                 else {
                     // desativa referencias
                     module.startIndex = -1;
                     module.windowIndex = -1;
+                    module.startStim = false;
                 }
-
             }
         }
     }
 }
 
+void StimDetector::setDiff(bool state)
+{
+    applyDiff = state;
+};
+
+
+double StimDetector::getThresholdValueForChannel(int chan)
+{
+    return thresholds[chan];
+}
 
 void StimDetector::saveCustomChannelParametersToXml(XmlElement* channelInfo, int channelNumber, InfoObjectCommon::InfoObjectType channelType)
 {

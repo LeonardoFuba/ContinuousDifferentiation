@@ -48,8 +48,8 @@ namespace StimDetectorSpace {
 */
 
 class StimDetectorEditor : public GenericEditor,
-    public Label::Listener,
-    public ComboBox::Listener
+    public ComboBox::Listener,
+    public Label::Listener
 {
 public:
     StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
@@ -102,8 +102,8 @@ private:
 };
 
 class DetectorInterface : public Component,
-    public ComboBox::Listener,
-    public Button::Listener
+    //public Button::Listener,
+    public ComboBox::Listener
 {
 public:
     DetectorInterface(StimDetector*, Colour, int);
@@ -112,15 +112,17 @@ public:
     void paint(Graphics& g);
 
     void comboBoxChanged(ComboBox*);
-    void buttonClicked(Button*);
+    //void buttonClicked(Button*);
 
     void updateChannels(int);
 
     void setInputChan(int);
     void setOutputChan(int);
+    void setGateChan(int);
 
     int getInputChan();
     int getOutputChan();
+    int getGateChan();
 
 	void setEnableStatus(bool status);
 
@@ -133,9 +135,9 @@ private:
     StimDetector* processor;
 
     ScopedPointer<ComboBox> inputSelector;
+    ScopedPointer<ComboBox> gateSelector;
     ScopedPointer<ComboBox> outputSelector;
     
-
 };
 
 }
