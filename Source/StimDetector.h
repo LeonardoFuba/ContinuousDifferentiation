@@ -62,8 +62,7 @@ namespace StimDetectorSpace {
         void saveCustomChannelParametersToXml(XmlElement* channelInfo, int channelNumber, InfoObjectCommon::InfoObjectType channelTypel) override;
         void loadCustomChannelParametersFromXml(XmlElement* channelInfo, InfoObjectCommon::InfoObjectType channelType)  override;
 
-        void setDiff(bool state);
-        bool applyDiff;
+        ////void setDiff(bool state);
 
     private:
         void handleEvent (const EventChannel* channelInfo, const MidiMessage& event, int sampleNum) override;
@@ -87,6 +86,7 @@ namespace StimDetectorSpace {
             float lastSample;           //last input original data
             float lastDiff;             //last input diff data
 
+            bool applyDiff;             //overwrite input chan data
             bool isActive;
             bool wasTriggered;          //ttl interval
             bool startStim;             //stim interval
@@ -106,7 +106,6 @@ namespace StimDetectorSpace {
         int activeModule;
         int lastNumInputs;
 
-        Array<bool> shouldDiffChannel;
         Array<double> thresholds;
         double defaultThreshold;
 

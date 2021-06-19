@@ -36,7 +36,7 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
     , previousChannelCount(-1)
 
 {
-    desiredWidth = 320;
+    desiredWidth = 330;
     lastThresholdString = " ";
 
     std::cout << "Creating buttons" << std::endl;
@@ -70,13 +70,6 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
     thresholdValue->addListener(this);
     thresholdValue->setTooltip("Set the threshold of detection");
     addAndMakeVisible(thresholdValue);
-
-    applyDiff = new UtilityButton("Diff", Font("Default", 10, Font::plain));
-    applyDiff->addListener(this);
-    applyDiff->setBounds(215, 80, 60, 18);
-    applyDiff->setClickingTogglesState(true);
-    applyDiff->setTooltip("When this button is off, selected channels will do not show differentiation");
-    addAndMakeVisible(applyDiff);
 
 
     backgroundColours.add(Colours::red);
@@ -200,12 +193,6 @@ void StimDetectorEditor::buttonEvent(Button* button)
         addDetector();
 		CoreServices::updateSignalChain(this);
     }
-
-    else if (button == applyDiff)
-    {
-        StimDetector* fn = (StimDetector*)getProcessor();
-        fn->setDiff(applyDiff->getToggleState());
-    }
     else
     {
 
@@ -278,7 +265,6 @@ void StimDetectorEditor::loadCustomParameters(XmlElement* xml)
             interfaces[i]->setInputChan(xmlNode->getIntAttribute("INPUT"));
             interfaces[i]->setOutputChan(xmlNode->getIntAttribute("OUTPUT"));
             lastThresholdString = xmlNode->getStringAttribute("THRESHOLD", lastThresholdString);
-            applyDiff->setToggleState(xmlNode->getBoolAttribute("applyDiff", false), sendNotification);
             i++;
         }
     }
@@ -290,6 +276,7 @@ void StimDetectorEditor::loadCustomParameters(XmlElement* xml)
 DetectorInterface::DetectorInterface(StimDetector* pd, Colour c, int id) :
     backgroundColour(c), idNum(id), processor(pd)
 {
+    /* set Bounds relative to (10,50,190,80) */
 
     // lastThresholdString = " ";
 
@@ -326,6 +313,13 @@ DetectorInterface::DetectorInterface(StimDetector* pd, Colour c, int id) :
     }
     outputSelector->setSelectedId(1);
     addAndMakeVisible(outputSelector);
+
+    applyDiff = new UtilityButton("Diff", Font("Default", 10, Font::plain));
+    applyDiff->addListener(this);
+    applyDiff->setBounds(10, 55, 60, 20);
+    applyDiff->setClickingTogglesState(true);
+    applyDiff->setTooltip("When this button is off, selected channels will do not show differentiation");
+    addAndMakeVisible(applyDiff);
 
 
     std::cout << "Updating channels" << std::endl;
@@ -374,10 +368,15 @@ void DetectorInterface::comboBoxChanged(ComboBox* c)
 	}
 }
 
-//void DetectorInterface::buttonClicked(Button* b)
-//{
-    /* processor->setActiveModule(idNum); */
-//}
+void DetectorInterface::buttonClicked(Button* button)
+{
+    if (button == applyDiff)
+    {
+        processor->setActiveModule(idNum);
+        processor->setParameter(1, (float)applyDiff->getToggleState() ? 1 : 0 );
+    }
+
+}
 
 void DetectorInterface::updateChannels(int numChannels)
 {

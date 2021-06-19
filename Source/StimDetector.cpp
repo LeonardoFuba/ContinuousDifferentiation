@@ -35,7 +35,6 @@ StimDetector::StimDetector()
 {
     setProcessorType (PROCESSOR_TYPE_FILTER);
 	lastNumInputs = 1;
-    applyDiff = false;
     count = -1;
 
     for (int i = 0; i < AVG_LENGTH; i++)
@@ -44,7 +43,6 @@ StimDetector::StimDetector()
     }
 
 }
-
 
 StimDetector::~StimDetector()
 {
@@ -69,6 +67,7 @@ void StimDetector::addModule()
     m.samplesSinceTrigger = 5000;
     m.lastSample = 0.0f;
     m.lastDiff = 0.0f;
+    m.applyDiff = false;
     m.isActive = true;
     m.wasTriggered = false;
     m.startStim = false;
@@ -94,7 +93,7 @@ void StimDetector::setParameter (int parameterIndex, float newValue)
 
     if (parameterIndex == 1) // empty
     {
-
+        module.applyDiff = (bool)newValue;
     }
     else if (parameterIndex == 2)   // inputChan
     {
@@ -198,12 +197,10 @@ void StimDetector::updateSettings()
 	lastNumInputs = getNumInputs();
 }
 
-
 bool StimDetector::enable()
 {
     return true;
 }
-
 
 void StimDetector::handleEvent(const EventChannel* channelInfo, const MidiMessage& event, int sampleNum)
 {
@@ -239,7 +236,6 @@ void StimDetector::handleEvent(const EventChannel* channelInfo, const MidiMessag
     }
 }
 
-
 void StimDetector::process(AudioSampleBuffer& buffer)
 {
     checkForEvents();
@@ -259,7 +255,7 @@ void StimDetector::process(AudioSampleBuffer& buffer)
             {
                 const float sample = *buffer.getReadPointer(module.inputChan, i);
                 const float diffSample = sample - module.lastSample;
-                if (applyDiff)
+                if (module.applyDiff)
                 {
                     *buffer.getWritePointer(module.inputChan, i) = diffSample;
                 }
@@ -334,12 +330,6 @@ void StimDetector::process(AudioSampleBuffer& buffer)
     }
 }
 
-void StimDetector::setDiff(bool state)
-{
-    applyDiff = state;
-};
-
-
 double StimDetector::getThresholdValueForChannel(int chan)
 {
     return thresholds[chan];
@@ -357,7 +347,6 @@ void StimDetector::saveCustomChannelParametersToXml(XmlElement* channelInfo, int
         channelParams->setAttribute ("threshold", thresholds[channelNumber]);
     }
 }
-
 
 void StimDetector::loadCustomChannelParametersFromXml(XmlElement* channelInfo, InfoObjectCommon::InfoObjectType channelType)
 {

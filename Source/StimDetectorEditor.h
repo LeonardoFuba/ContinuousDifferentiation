@@ -47,98 +47,100 @@ namespace StimDetectorSpace {
 
 */
 
-class StimDetectorEditor : public GenericEditor,
-    public ComboBox::Listener,
-    public Label::Listener
-{
-public:
-    StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
+    class StimDetectorEditor : public GenericEditor,
+        public ComboBox::Listener,
+        public Label::Listener
+    {
+    public:
+        StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
 
-    virtual ~StimDetectorEditor();
+        virtual ~StimDetectorEditor();
 
-    void buttonEvent(Button* button);
-    void comboBoxChanged(ComboBox* c);
+        void buttonEvent(Button* button);
+        void comboBoxChanged(ComboBox* c);
   
-    void labelTextChanged(Label* label);
-    void setDefaults(double threshold);
-    void resetToSavedText();
-    void channelChanged(int chan, bool newState);
+        void labelTextChanged(Label* label);
+        void setDefaults(double threshold);
+        void resetToSavedText();
+        void channelChanged(int chan, bool newState);
 
-    void updateSettings();
+        void updateSettings();
 
-    void saveCustomParameters(XmlElement* xml);
-    void loadCustomParameters(XmlElement* xml);
+        void saveCustomParameters(XmlElement* xml);
+        void loadCustomParameters(XmlElement* xml);
 
-	void startAcquisition() override;
-	void stopAcquisition() override;
+	    void startAcquisition() override;
+	    void stopAcquisition() override;
 
-private:
+    private:
 
-    ScopedPointer<ComboBox> detectorSelector;
+        ScopedPointer<ComboBox> detectorSelector;
     
-    ScopedPointer<UtilityButton> plusButton;
-    ScopedPointer<UtilityButton> applyDiff;
+        ScopedPointer<UtilityButton> plusButton;
     
-    String lastThresholdString;
-    ScopedPointer<Label> thresholdLabel;
-    ScopedPointer<Label> thresholdValue;
-
-    void addDetector();
-
-    // ScopedPointer<ComboBox> inputChannelSelectionBox;
-    // ScopedPointer<ComboBox> outputChannelSelectionBox;
-
-    // ScopedPointer<Label> intputChannelLabel;
-    // ScopedPointer<Label> outputChannelLabel;
-
-    OwnedArray<DetectorInterface> interfaces;
-
-    int previousChannelCount;
-
-    Array<Colour> backgroundColours;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorEditor);
-
-};
-
-class DetectorInterface : public Component,
-    //public Button::Listener,
-    public ComboBox::Listener
-{
-public:
-    DetectorInterface(StimDetector*, Colour, int);
-    ~DetectorInterface();
-
-    void paint(Graphics& g);
-
-    void comboBoxChanged(ComboBox*);
-    //void buttonClicked(Button*);
-
-    void updateChannels(int);
-
-    void setInputChan(int);
-    void setOutputChan(int);
-    void setGateChan(int);
-
-    int getInputChan();
-    int getOutputChan();
-    int getGateChan();
-
-	void setEnableStatus(bool status);
-
-private:
-    Colour backgroundColour;
-    Font font;
-
-    int idNum;
-
-    StimDetector* processor;
-
-    ScopedPointer<ComboBox> inputSelector;
-    ScopedPointer<ComboBox> gateSelector;
-    ScopedPointer<ComboBox> outputSelector;
     
-};
+        String lastThresholdString;
+        ScopedPointer<Label> thresholdLabel;
+        ScopedPointer<Label> thresholdValue;
+
+        void addDetector();
+
+        // ScopedPointer<ComboBox> inputChannelSelectionBox;
+        // ScopedPointer<ComboBox> outputChannelSelectionBox;
+
+        // ScopedPointer<Label> intputChannelLabel;
+        // ScopedPointer<Label> outputChannelLabel;
+
+        OwnedArray<DetectorInterface> interfaces;
+
+        int previousChannelCount;
+
+        Array<Colour> backgroundColours;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorEditor);
+
+    };
+
+    class DetectorInterface : public Component,
+        public Button::Listener,
+        public ComboBox::Listener
+    {
+    public:
+        DetectorInterface(StimDetector*, Colour, int);
+        ~DetectorInterface();
+
+        void paint(Graphics& g);
+
+        void comboBoxChanged(ComboBox*);
+        //void buttonEvent(Button*);
+        void buttonClicked(Button*);
+
+        void updateChannels(int);
+
+        void setInputChan(int);
+        void setOutputChan(int);
+        void setGateChan(int);
+
+        int getInputChan();
+        int getOutputChan();
+        int getGateChan();
+
+	    void setEnableStatus(bool status);
+
+    private:
+        StimDetector* processor;
+    
+        Colour backgroundColour;
+        Font font;
+
+        int idNum;
+
+        ScopedPointer<ComboBox> inputSelector;
+        ScopedPointer<ComboBox> gateSelector;
+        ScopedPointer<ComboBox> outputSelector;
+
+        ScopedPointer<UtilityButton> applyDiff;
+    };
 
 }
 
