@@ -1,23 +1,23 @@
 /*
-    ------------------------------------------------------------------
+  ------------------------------------------------------------------
 
-    This file is part of the Open Ephys GUI
-    Copyright (C) 2013 Open Ephys
+  This file is part of the Open Ephys GUI
+  Copyright (C) 2013 Open Ephys
 
-    ------------------------------------------------------------------
+  ------------------------------------------------------------------
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
@@ -35,9 +35,9 @@
 
 namespace StimDetectorSpace {
 
-    class DetectorInterface;
-    class StimDetector;
-    // class FilterViewport;
+  class DetectorInterface;
+  class StimDetector;
+  // class FilterViewport;
 
 /**
 
@@ -47,100 +47,101 @@ namespace StimDetectorSpace {
 
 */
 
-    class StimDetectorEditor : public GenericEditor,
-        public ComboBox::Listener,
-        public Label::Listener
-    {
-    public:
-        StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
+  class StimDetectorEditor : public GenericEditor,
+    public ComboBox::Listener,
+    public Label::Listener
+  {
+  public:
+    StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
 
-        virtual ~StimDetectorEditor();
+    virtual ~StimDetectorEditor();
 
-        void buttonEvent(Button* button);
-        void comboBoxChanged(ComboBox* c);
+    void buttonEvent(Button* button);
+    void comboBoxChanged(ComboBox* c);
   
-        void labelTextChanged(Label* label);
-        void setDefaults(double threshold);
-        void resetToSavedText();
-        void channelChanged(int chan, bool newState);
+    void labelTextChanged(Label* label);
+    void channelChanged(int chan, bool /*newState*/);
 
-        void updateSettings();
+    void updateSettings();
 
-        void saveCustomParameters(XmlElement* xml);
-        void loadCustomParameters(XmlElement* xml);
+    void saveCustomParameters(XmlElement* xml);
+    void loadCustomParameters(XmlElement* xml);
 
-	    void startAcquisition() override;
-	    void stopAcquisition() override;
+    void startAcquisition() override;
+    void stopAcquisition() override;
 
-    private:
+  private:
 
-        ScopedPointer<ComboBox> detectorSelector;
-    
-        ScopedPointer<UtilityButton> plusButton;
-    
-    
-        String lastThresholdString;
-        ScopedPointer<Label> thresholdLabel;
-        ScopedPointer<Label> thresholdValue;
+    ScopedPointer<ComboBox> detectorSelector;
+    ScopedPointer<UtilityButton> plusButton;
 
-        void addDetector();
+    void addDetector();
 
-        // ScopedPointer<ComboBox> inputChannelSelectionBox;
-        // ScopedPointer<ComboBox> outputChannelSelectionBox;
+    // ScopedPointer<ComboBox> inputChannelSelectionBox;
+    // ScopedPointer<ComboBox> outputChannelSelectionBox;
 
-        // ScopedPointer<Label> intputChannelLabel;
-        // ScopedPointer<Label> outputChannelLabel;
+    // ScopedPointer<Label> intputChannelLabel;
+    // ScopedPointer<Label> outputChannelLabel;
 
-        OwnedArray<DetectorInterface> interfaces;
+    OwnedArray<DetectorInterface> interfaces;
 
-        int previousChannelCount;
+    int previousChannelCount;
 
-        Array<Colour> backgroundColours;
+    Array<Colour> backgroundColours;
 
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorEditor);
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorEditor);
 
-    };
+  };
 
-    class DetectorInterface : public Component,
-        public Button::Listener,
-        public ComboBox::Listener
-    {
-    public:
-        DetectorInterface(StimDetector*, Colour, int);
-        ~DetectorInterface();
+  class DetectorInterface : public Component,
+    public Button::Listener,
+    public ComboBox::Listener,
+    public Label::Listener
+  {
+  public:
+    DetectorInterface(StimDetector*, Colour, int);
+    ~DetectorInterface();
 
-        void paint(Graphics& g);
+    void paint(Graphics& g);
 
-        void comboBoxChanged(ComboBox*);
-        //void buttonEvent(Button*);
-        void buttonClicked(Button*);
+    void comboBoxChanged(ComboBox*);
+    //void buttonEvent(Button*);
+    void buttonClicked(Button*);
+    void labelTextChanged(Label*);
 
-        void updateChannels(int);
+    void updateChannels(int);
 
-        void setInputChan(int);
-        void setOutputChan(int);
-        void setGateChan(int);
+    void setInputChan(int);
+    void setOutputChan(int);
+    void setGateChan(int);
+    void setThreshold(double);
 
-        int getInputChan();
-        int getOutputChan();
-        int getGateChan();
+    int getInputChan();
+    int getOutputChan();
+    int getGateChan();
+    double getThreshold();
 
-	    void setEnableStatus(bool status);
+    void setEnableStatus(bool status);
 
-    private:
-        StimDetector* processor;
-    
-        Colour backgroundColour;
-        Font font;
+  private:
+    StimDetector* processor;
+  
+    Colour backgroundColour;
+    Font font;
 
-        int idNum;
+    int idNum;
 
-        ScopedPointer<ComboBox> inputSelector;
-        ScopedPointer<ComboBox> gateSelector;
-        ScopedPointer<ComboBox> outputSelector;
+    String lastThresholdString;
 
-        ScopedPointer<UtilityButton> applyDiff;
-    };
+    ScopedPointer<ComboBox> inputSelector;
+    ScopedPointer<ComboBox> gateSelector;
+    ScopedPointer<ComboBox> outputSelector;
+
+    ScopedPointer<UtilityButton> applyDiff;
+
+    ScopedPointer<Label> thresholdLabel;
+    ScopedPointer<Label> thresholdValue;
+  };
 
 }
 
