@@ -23,20 +23,19 @@
 
 
 #include "StimDetectorEditor.h"
+#include "StimDetectorCanvas.h"
 #include "StimDetector.h"
 
 #include <stdio.h>
-#include <cmath>
 #include <iostream>
+#include <cmath>
 
 using namespace StimDetectorSpace;
 
-StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors=true)
-  : GenericEditor(parentNode, useDefaultParameterEditors)
-  , previousChannelCount(-1)
-
+StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors=true) :
+  VisualizerEditor(parentNode, 220, useDefaultParameterEditors),
+  previousChannelCount(-1)
 {
-  desiredWidth = 220;
 
   std::cout << "Creating buttons" << std::endl;
 
@@ -61,6 +60,14 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
 
 StimDetectorEditor::~StimDetectorEditor()
 {
+}
+
+Visualizer* StimDetectorEditor::createNewCanvas()
+{
+  // canvas is a public <Visualizer> field
+  StimDetector* sd = (StimDetector*)getProcessor();
+  canvas = new StimDetectorCanvas(sd);
+  return canvas;
 }
 
 void StimDetectorEditor::startAcquisition()

@@ -30,7 +30,7 @@
 #include <Windows.h>
 #endif
 
-#include <EditorHeaders.h>
+#include <VisualizerEditorHeaders.h>
 
 
 namespace StimDetectorSpace {
@@ -47,14 +47,15 @@ namespace StimDetectorSpace {
 
 */
 
-  class StimDetectorEditor : public GenericEditor,
+  class StimDetectorEditor : public VisualizerEditor,
     public ComboBox::Listener,
     public Label::Listener
   {
   public:
     StimDetectorEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors);
+    ~StimDetectorEditor();
 
-    virtual ~StimDetectorEditor();
+    Visualizer* createNewCanvas() override;
 
     void buttonEvent(Button* button);
     void comboBoxChanged(ComboBox* c);
