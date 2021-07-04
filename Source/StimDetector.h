@@ -32,6 +32,7 @@
 #include <ProcessorHeaders.h>
 
 #define AVG_LENGTH 400
+#define TTL_LENGTH 10
 
 namespace StimDetectorSpace {
 
@@ -57,8 +58,15 @@ namespace StimDetectorSpace {
     bool enable() override;
     void process (AudioSampleBuffer& buffer) override;
 
+    void splitAvgArray();
+    void clearAgvArray();
+    
     double getThresholdValueForActiveModule();
-    Array<Array<double>> getWaveformParams(); //moduleIndex.paramIndex
+    Array<double> getLastWaveformParams(); //paramIndex
+    Array<Array<double>> getAvgMatrixParams(); //AvgSection.paramIndex
+    int getActiveModule();
+
+    
 
     //void saveCustomChannelParametersToXml(XmlElement* channelInfo, int channelNumber, InfoObjectCommon::InfoObjectType channelTypel) override;
     //void loadCustomChannelParametersFromXml(XmlElement* channelInfo, InfoObjectCommon::InfoObjectType channelType)  override;
@@ -84,6 +92,8 @@ namespace StimDetectorSpace {
 
       float lastSample;           //last input original data
       float lastDiff;             //last input diff data
+      
+      double threshold;           //threshold of detection
 
       bool applyDiff;             //overwrite input chan data
       bool isActive;              //channels to display in canvas
@@ -94,12 +104,23 @@ namespace StimDetectorSpace {
       int startIndex;             //intput index
       int windowIndex;            //avg index
       int count;                  //avg count
+ 
+      Array<double> stim;         //avg of stims
+      Array<int64> timestamps;    //last stim timestamps
+      double yMax;                //max of stim
+      double yMin;                //min of stim
+      int64 xMax;                 //time of max
+      int64 xMin;                 //time of min
 
-      double threshold;           //threshold of detection
+      Array<double> avg;          //avg of stims
+      double yAvgMax;             //max of avg stim
+      double yAvgMin;             //min of avg stim
+      int64 xAvgMax;              //time of avg max
+      int64 xAvgMin;              //time of avg min
 
-      double max;                 //max of stim
-      double min;                 //min of stim
       //double avg[AVG_LENGTH];
+
+      //StimPlot* stimPlot;         //Canvas Component
       ModuleType type;
       PhaseType phase;
     };
@@ -110,6 +131,8 @@ namespace StimDetectorSpace {
     double defaultThreshold;
 
     double media[AVG_LENGTH];
+
+    CriticalSection onlineReset;
 
     Array<const EventChannel*> moduleEventChannels;
 

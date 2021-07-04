@@ -36,6 +36,7 @@ StimDetectorEditor::StimDetectorEditor(GenericProcessor* parentNode, bool useDef
   VisualizerEditor(parentNode, 220, useDefaultParameterEditors),
   previousChannelCount(-1)
 {
+  tabText = "Stim Detector";
 
   std::cout << "Creating buttons" << std::endl;
 
@@ -145,6 +146,7 @@ void StimDetectorEditor::updateSettings()
 
 void StimDetectorEditor::comboBoxChanged(ComboBox* c)
 {
+  StimDetector* sd = (StimDetector*)getProcessor();
 
   for (int i = 0; i < interfaces.size(); i++)
   {
@@ -152,7 +154,9 @@ void StimDetectorEditor::comboBoxChanged(ComboBox* c)
     if (i == c->getSelectedId()-1)
     {
       interfaces[i]->setVisible(true);
-    }
+      StimDetector* sd = (StimDetector*) getProcessor();
+      sd->setActiveModule(i);
+     }
     else
     {
       interfaces[i]->setVisible(false);
@@ -160,11 +164,12 @@ void StimDetectorEditor::comboBoxChanged(ComboBox* c)
 
   }
 
+  std::cout << "active module id: " << sd->getActiveModule() << std::endl;
 }
 
 void StimDetectorEditor::buttonEvent(Button* button)
 {
-  if (button == plusButton && interfaces.size() < 8)
+  if (button == plusButton && interfaces.size() < 1)
   {
     addDetector();
     CoreServices::updateSignalChain(this);
@@ -366,16 +371,6 @@ void DetectorInterface::buttonClicked(Button* button)
   {
     processor->setActiveModule(idNum);
     processor->setParameter(1, (float)applyDiff->getToggleState() ? 1 : 0 );
-  }
-
-  Array<Array<double>> data = processor->getWaveformParams();
-
-  for (int m = 0; m < data.size(); m++)
-  {
-    for (int n = 0; n < data[m].size(); n++)
-    {
-      std::cout << "param: " << data[m][n] << std::endl;
-    }
   }
 }
 

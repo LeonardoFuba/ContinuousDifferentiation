@@ -26,6 +26,8 @@
 #include <math.h>
 #include <iostream>
 
+#define PI 3.1415926535897932384626433
+
 using namespace StimDetectorSpace;
 
 StimDetector::StimDetector()
@@ -67,8 +69,14 @@ void StimDetector::addModule()
   m.lastSample = 0.0f;
   m.lastDiff = 0.0f;
   m.threshold = 0.0f;
-  m.max = 0.0f;
-  m.min = 0.0f;
+  m.yMin = 0.0f;
+  m.yMax = 0.0f;
+  m.xMin = 0.0f;
+  m.xMax = 0.0f;
+  m.yAvgMin = 0.0f;
+  m.yAvgMax = 0.0f;
+  m.xAvgMin = 0.0f;
+  m.xAvgMax = 0.0f;
   m.applyDiff = false;
   m.isActive = true;
   m.wasTriggered = false;
@@ -76,11 +84,11 @@ void StimDetector::addModule()
   m.detectorStim = true;
   m.startIndex = -1;
   m.windowIndex = -1;
-  m.count = -1;
-
-  //for (int i = 0; i < AVG_LENGTH; i++)
-  //m.avg[i] = 0;
-
+  m.count = 0;
+  m.stim.resize(AVG_LENGTH);
+  m.avg.resize(AVG_LENGTH);
+  m.timestamps.resize(AVG_LENGTH);
+  
   modules.add (m);
 }
 
@@ -189,28 +197,28 @@ void StimDetector::handleEvent(const EventChannel* channelInfo, const MidiMessag
 
   if (Event::getEventType(event) == EventChannel::TTL)
   {
-  TTLEventPtr ttl = TTLEvent::deserializeFromMessage(event, channelInfo);
+    TTLEventPtr ttl = TTLEvent::deserializeFromMessage(event, channelInfo);
 
-  // int eventNodeId = *(dataptr+1);
-  const int eventId = ttl->getState() ? 1 : 0;
-  const int eventChannel = ttl->getChannel();
+    // int eventNodeId = *(dataptr+1);
+    const int eventId = ttl->getState() ? 1 : 0;
+    const int eventChannel = ttl->getChannel();
 
-  for (int i = 0; i < modules.size(); ++i)
-  {
-    DetectorModule& module = modules.getReference(i);
-
-    if (module.gateChan == eventChannel)
+    for (int i = 0; i < modules.size(); ++i)
     {
-    if (eventId)
-    {
-      module.startStim = true;
-      module.detectorStim = false;
+      DetectorModule& module = modules.getReference(i);
+
+      if (module.gateChan == eventChannel && module.startIndex < 0)
+      {
+        if (eventId)
+        {
+          module.startStim = true;
+          module.detectorStim = false;
+        }
+        else {
+          module.startStim = false;
+        }
+      }
     }
-    else {
-      module.startStim = false;
-    }
-    }
-  }
   }
 }
 
@@ -221,122 +229,109 @@ void StimDetector::process(AudioSampleBuffer& buffer)
   // loop through the modules
   for (int m = 0; m < modules.size(); ++m)
   {
-  DetectorModule& module = modules.getReference(m);
+    DetectorModule& module = modules.getReference(m);
 
-  // check to see if it's active and has a channel
-  if (module.outputChan >= 0
-    && module.inputChan >= 0
-    && module.inputChan < buffer.getNumChannels())
-  {
-    int bufferLength = getNumSamples(module.inputChan);
-    for (int i = 0; i < bufferLength; ++i)
+    // check to see if it's active and has a channel
+    if (module.outputChan >= 0
+      && module.inputChan >= 0
+      && module.inputChan < buffer.getNumChannels())
     {
-    const float sample = *buffer.getReadPointer(module.inputChan, i);
-    const float diffSample = sample - module.lastSample;
-
-    if (module.applyDiff)
-    {
-      *buffer.getWritePointer(module.inputChan, i) = diffSample;
-    }
-
-    if (module.detectorStim) // Gate disableded
-    {
-      if (diffSample > module.lastDiff        //variacao brusca
-      && diffSample > module.threshold    //acima do limiar
-      && !module.startStim)               //fora do TTL
+      int bufferLength = getNumSamples(module.inputChan);
+      for (int i = 0; i < bufferLength; ++i)
       {
-      //inicia TTL
-      uint8 ttlData = 1 << module.outputChan;
-      TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-      addEvent(moduleEventChannels[m], event, i);
-      module.samplesSinceTrigger = 0;
-      module.wasTriggered = true;
-      module.startStim = true;
+      const float sample = *buffer.getReadPointer(module.inputChan, i);
+      const float diffSample = sample - module.lastSample;
 
-      //config avg
-      module.startIndex = i;
-      module.windowIndex = 0;
-      module.count++;
+      if (module.applyDiff)
+      {
+        *buffer.getWritePointer(module.inputChan, i) = diffSample;
       }
 
-      //durante TTL
-      if (module.wasTriggered)
+      if (module.detectorStim) // Gate disableded
       {
-      //finalizacao do TTL
-      if (module.samplesSinceTrigger > 10)
-      {
-        uint8 ttlData = 0;
+        if (diffSample > module.lastDiff    //variacao brusca
+        && diffSample > module.threshold    //acima do limiar
+        && !module.startStim)               //fora do TTL
+        {
+        //inicia TTL
+        uint8 ttlData = 1 << module.outputChan;
         TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
         addEvent(moduleEventChannels[m], event, i);
-        module.wasTriggered = false;
-      }
-      else
+        module.samplesSinceTrigger = 0;
+        module.wasTriggered = true;
+        module.startStim = true;
+
+        //config avg
+        module.startIndex = i;
+        module.windowIndex = 0;
+        module.count++;
+        }
+
+        //durante TTL
+        if (module.wasTriggered)
+        {
+        //finalizacao do TTL
+          if (module.samplesSinceTrigger > TTL_LENGTH)
+          {
+            uint8 ttlData = 0;
+            TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
+            addEvent(moduleEventChannels[m], event, i);
+            module.wasTriggered = false;
+          }
+          else
+          {
+            module.samplesSinceTrigger++;
+          }
+        }
+      } // end gate disableded
+
+      /* TTL gate enableded */
+      if (!module.detectorStim && module.startStim)
       {
-        module.samplesSinceTrigger++;
+        module.startIndex = i;
+        module.windowIndex = 0;
+        module.count++;
+        module.startStim = false;
       }
+
+      // esta dentro da janela
+      if (module.startIndex >= 0 && module.windowIndex < AVG_LENGTH)
+      {
+        module.stim.set(module.windowIndex, sample);
+        module.timestamps.set(module.windowIndex, getTimestamp(module.inputChan));
+
+        module.avg.set(module.windowIndex, (module.avg[module.windowIndex] * ((double)module.count - 1) + sample) / (double)(module.count));
+        
+        if (module.avg[module.windowIndex] < module.yAvgMin && module.windowIndex >= TTL_LENGTH)
+        {
+          module.xAvgMin = getTimestamp(module.inputChan);
+          module.yAvgMin = module.avg[module.windowIndex];
+        }
+        if (module.avg[module.windowIndex] > module.yAvgMax && module.windowIndex >= TTL_LENGTH)
+        {
+          module.xAvgMax = getTimestamp(module.inputChan);
+          module.yAvgMax = module.avg[module.windowIndex];
+        }
+
+        //output
+        //media[module.windowIndex] = (media[module.windowIndex] * ((double)module.count - 1) + sample) / (double)(module.count);
+        //*buffer.getWritePointer(module.inputChan, i) = module.avg[module.windowIndex];
+        module.windowIndex++;
+      }
+      else {
+        // desativa referencias
+        module.startIndex = -1;
+        module.windowIndex = -1;
+        module.startStim = false;
+      }
+
+      module.lastSample = sample;
+      module.lastDiff = diffSample;
       }
     }
-
-    /* TTL gate enableded */
-    if (!module.detectorStim && module.startStim)
-    {
-      module.startIndex = i;
-      module.windowIndex = 0;
-      module.count++;
-      module.startStim = false;
-    }
-
-    // esta dentro da janela
-    if (module.startIndex >= 0 && module.windowIndex < AVG_LENGTH)
-    {
-      if (sample < module.min)
-      module.min = sample;
-      if (sample > module.max)
-      module.max = sample;
-
-      media[module.windowIndex] = (media[module.windowIndex] * module.count + sample) / (double)(module.count + 1);
-      //std::cout << "count=;" << count << ";i="<<i<< ";media[" << module.windowIndex << "] ;" << media[module.windowIndex] << std::endl;
-      module.windowIndex++;
-
-      //output
-      //*buffer.getWritePointer(module.inputChan, i) = module.avg[module.windowIndex];
-    }
-    else {
-      // desativa referencias
-      module.startIndex = -1;
-      module.windowIndex = -1;
-      module.startStim = false;
-    }
-
-
-    module.lastSample = sample;
-    module.lastDiff = diffSample;
-    }
-  }
   }
 }
 
-double StimDetector::getThresholdValueForActiveModule()
-{
-  DetectorModule& module = modules.getReference(activeModule);
-  return module.threshold;
-}
-
-Array<Array<double>> StimDetector::getWaveformParams()
-{
-  Array<Array<double>> allModulesParams;
-  for (int m = 0; m < modules.size(); ++m)
-  {
-  DetectorModule& module = modules.getReference(m);
-
-  Array<double> thisModuleParams;
-  thisModuleParams.add(module.min);
-  thisModuleParams.add(module.max);
-
-  allModulesParams.add(thisModuleParams);
-  }
-  return allModulesParams;
-}
 
 //void StimDetector::saveCustomChannelParametersToXml(XmlElement* channelInfo, int channelNumber, InfoObjectCommon::InfoObjectType channelType)
 /*{
@@ -361,8 +356,101 @@ Array<Array<double>> StimDetector::getWaveformParams()
     if (subNode->hasTagName ("PARAMETERS"))
     {
     thresholds.set (channelNum, subNode->getDoubleAttribute ("threshold", defaultThreshold));
-    
+
     }
   }
   }
 }*/
+
+
+void StimDetector::splitAvgArray()
+{
+  
+}
+
+void StimDetector::clearAgvArray()
+{
+  ScopedLock resetLock(onlineReset);
+
+  DetectorModule& module = modules.getReference(activeModule);
+  module.avg.clear();
+  module.avg.resize(AVG_LENGTH);
+  module.count = 0;
+  module.yAvgMin = 0.0f;
+  module.yAvgMax = 0.0f;
+  module.xAvgMin = 0.0f;
+  module.xAvgMax = 0.0f;
+}
+
+int StimDetector::getActiveModule() {
+  return activeModule;
+}
+
+double StimDetector::getThresholdValueForActiveModule()
+{
+  DetectorModule& module = modules.getReference(activeModule);
+  return module.threshold;
+}
+
+Array<double> StimDetector::getLastWaveformParams()
+{
+  DetectorModule& dm = modules.getReference(activeModule);
+
+  dm.xMin = 0.0f;
+  dm.yMin = 0.0f;
+  for (int t = 0; t < AVG_LENGTH; t++)
+  {
+    if (dm.stim[t] < dm.yMin && t >= TTL_LENGTH)
+    {
+      dm.xMin = dm.timestamps[t];
+      dm.yMin = dm.stim[t];
+    }
+  }
+
+  dm.xMax = dm.xMin;
+  dm.yMax = dm.yMin;
+  for (int t = 0; t < AVG_LENGTH; t++)
+  {
+    if (dm.stim[t] > dm.yMax && t >= TTL_LENGTH)
+    {
+      dm.xMax = dm.timestamps[t];
+      dm.yMax = dm.stim[t];
+    }
+  }
+ 
+  double slope = dm.xMax - dm.xMin == 0 ? 0
+    : atan((dm.yMax - dm.yMin) / (dm.xMax - dm.xMin)) * 180 / PI;
+
+  Array<double> moduleParams;
+  moduleParams.add(dm.yMin);              //MIN
+  moduleParams.add(dm.yMax);              //MAX
+  moduleParams.add(dm.yMax - dm.yMin);    //PEAK TO PEAK
+  moduleParams.add(dm.xMax - dm.xMin);    //LATENCY
+  moduleParams.add(slope);                //SLOPE
+  moduleParams.add(dm.count);             //AVG COUNT
+
+  return moduleParams;
+}
+
+Array<Array<double>> StimDetector::getAvgMatrixParams()
+{
+  Array<Array<double>> allModulesParams;
+  //for (int m = 0; m < modules.size(); ++m)
+  //{
+  DetectorModule& dm = modules.getReference(activeModule);
+
+  double slope = dm.xAvgMax - dm.xAvgMin == 0 ? 0
+    : atan((dm.yAvgMax - dm.yAvgMin) / (dm.xAvgMax - dm.xAvgMin)) * 180 / PI;
+
+  Array<double> thisModuleParams;
+  thisModuleParams.add(dm.yAvgMin);               //MIN
+  thisModuleParams.add(dm.yAvgMax);               //MAX
+  thisModuleParams.add(dm.yAvgMax - dm.yAvgMin);  //PEAK TO PEAK
+  thisModuleParams.add(dm.xAvgMax - dm.xAvgMin);  //LATENCY
+  thisModuleParams.add(slope);                    //SLOPE
+  thisModuleParams.add(dm.count);                 //AVG COUNT
+
+  allModulesParams.add(thisModuleParams); //row of table
+  //}
+  return allModulesParams;
+}

@@ -34,54 +34,97 @@
 #include "StimDetector.h"
 #include <vector>
 
+#define PADDING_TOP 50
+#define SCALE_WIDTH 0
+
 namespace StimDetectorSpace {
+
+  class DetectorDisplay;
 
   /**
   Displays stim waveforms.
   @see StimDetector, StimDetectorEditor, Visualizer
   */
 
-  class StimDetectorCanvas : 
-    public Visualizer
-    //public Button::Listener,
+  class StimDetectorCanvas :
+    public Visualizer,
+    public Button::Listener
     //public ComboBox::Listener,
     //public Label::Listener
 
   {
-    public:
-      StimDetectorCanvas(StimDetector* sd);
-      ~StimDetectorCanvas();
-      void refreshState();
-      void resized();
-      void update();
-      void refresh();
-      void beginAnimation();
-      void endAnimation();
-      void paint(Graphics& g);
+  public:
+    StimDetectorCanvas(StimDetector* sd);
+    ~StimDetectorCanvas();
 
-      void saveVisualizerParameters(XmlElement* xml);
-      void loadVisualizerParameters(XmlElement* xml);
+    /** Called when the component's tab becomes visible again.*/
+    void refreshState();
 
-      void setParameter(int, float) {}
-      void setParameter(int, int, int, float) {}
+    void resized();
 
-    private:
-      StimDetector* processor;
+    /** Called when parameters of underlying data processor are changed.*/
+    void update();
 
-      void flipCanvas();
-      Label* createLabel(const String& name, const String& text, juce::Rectangle<int> bounds);
+    /** Called instead of "repaint" to avoid redrawing underlying components if not necessary.*/
+    void refresh();
 
-      /* Window */
-      ScopedPointer<Viewport> viewport;
-      ScopedPointer<Component> canvas;
-      juce::Rectangle<int> canvasBounds;
-      //int scrollBarThickness;
+    void beginAnimation();
+    void endAnimation();
+    void paint(Graphics& g);
 
-      /* Window content */
-      ScopedPointer<Label> title;
+    void saveVisualizerParameters(XmlElement* xml);
+    void loadVisualizerParameters(XmlElement* xml);
 
-      JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorCanvas);
+    void setParameter(int, float) {}
+    void setParameter(int, int, int, float) {}
+
+    void buttonClicked(Button*) override;
+
+  private:
+    StimDetector* processor;
+
+    void flipCanvas();
+    Label* createLabel(const String& name, const String& text, const Justification& justification, juce::Rectangle<int> bounds);
+
+    /* Window */
+    ScopedPointer<Viewport> viewport;
+    ScopedPointer<Component> canvas;
+    juce::Rectangle<int> canvasBounds;
+    //int scrollBarThickness;
+
+    /* Window content */
+    Array<Colour> colours;
+    Font font;
+    Array<double> last; // 1 detector params
+    Array<Array<double>> avgMatrix; // avgIndex.detectorParams
+
+    ScopedPointer<Label> title;
+    ScopedPointer<UtilityButton> resetButton;
+    ScopedPointer<UtilityButton> splitButton;
+
+    //ScopedPointer<StimDetectorDisplay> stimDisplay;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetectorCanvas);
   };
+
+  // ===================================================================
+  /**
+  class DetectorDisplay:
+    public Component
+  {
+  public:
+    DetectorDisplay(StimDetector*, StimDetectorCanvas*, Viewport*);
+    ~DetectorDisplay();
+    void paint(Graphics& g);
+    void resized() {};
+    void mouseDown(const juce::MouseEvent& event) {};
+    void clear() {};
+  private:
+    StimDetector* processor;
+    StimDetectorCanvas* canvas;
+    Viewport* viewport;
+  };
+  */
 }
 
 #endif  // STIMDETECTORCANVAS_H_DEFINED
