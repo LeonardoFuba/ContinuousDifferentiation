@@ -105,8 +105,8 @@ void StimDetectorCanvas::paint(Graphics& g)
   g.fillRect(0, PADDING_TOP - 1, getWidth(), 1);
 
 
-  int cols = last.size(); //6
-  int rows = 1;           //avg lines
+  int cols = last.size();       //6
+  int rows = avgMatrix.size();  //avg lines
 
   g.setFont(font);
 
@@ -218,6 +218,7 @@ void StimDetectorCanvas::refresh()
   //processor data  
   last = processor->getLastWaveformParams();
   avgMatrix = processor->getAvgMatrixParams();
+  //std::cout << "avgMatrix: " << avgMatrix.size() << ", " << avgMatrix[0].size() << std::endl;
 
   repaint(); //update graphics
 

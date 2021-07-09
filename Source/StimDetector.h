@@ -31,7 +31,7 @@
 
 #include <ProcessorHeaders.h>
 
-#define AVG_LENGTH 400
+#define AVG_LENGTH 487
 #define TTL_LENGTH 10
 
 namespace StimDetectorSpace {
@@ -61,10 +61,10 @@ namespace StimDetectorSpace {
     void splitAvgArray();
     void clearAgvArray();
     
+    int getActiveModule();
     double getThresholdValueForActiveModule();
     Array<double> getLastWaveformParams(); //paramIndex
     Array<Array<double>> getAvgMatrixParams(); //AvgSection.paramIndex
-    int getActiveModule();
 
     
 
@@ -112,13 +112,13 @@ namespace StimDetectorSpace {
       int64 xMax;                 //time of max
       int64 xMin;                 //time of min
 
-      Array<double> avg;          //avg of stims
-      double yAvgMax;             //max of avg stim
-      double yAvgMin;             //min of avg stim
-      int64 xAvgMax;              //time of avg max
-      int64 xAvgMin;              //time of avg min
-
-      //double avg[AVG_LENGTH];
+      Array<double> avg;            //avg of stims
+      Array<Array<double>> matrix;  //avg of stims
+      int activeRow;                //last row of avg
+      Array<double> yAvgMax;        //max of avg stim
+      Array<double> yAvgMin;        //min of avg stim
+      Array<int64> xAvgMax;         //time of avg max
+      Array<int64> xAvgMin;         //time of avg min
 
       //StimPlot* stimPlot;         //Canvas Component
       ModuleType type;
@@ -130,16 +130,14 @@ namespace StimDetectorSpace {
     int lastNumInputs;
     double defaultThreshold;
 
-    double media[AVG_LENGTH];
-
-    CriticalSection onlineReset;
+    //CriticalSection onlineReset;
 
     Array<const EventChannel*> moduleEventChannels;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StimDetector);
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StimDetector);
   };
 
 }
 
 
-#endif  // __PHASEDETECTOR_H_DEFINED
+#endif  // __STIMDETECTOR_H_DEFINED

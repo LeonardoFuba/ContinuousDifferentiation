@@ -37,12 +37,6 @@ StimDetector::StimDetector()
 {
   setProcessorType (PROCESSOR_TYPE_FILTER);
   lastNumInputs = 1;
-
-  for (int i = 0; i < AVG_LENGTH; i++)
-  {
-  media[i] = 0;
-  }
-
 }
 
 StimDetector::~StimDetector()
@@ -71,12 +65,8 @@ void StimDetector::addModule()
   m.threshold = 0.0f;
   m.yMin = 0.0f;
   m.yMax = 0.0f;
-  m.xMin = 0.0f;
-  m.xMax = 0.0f;
-  m.yAvgMin = 0.0f;
-  m.yAvgMax = 0.0f;
-  m.xAvgMin = 0.0f;
-  m.xAvgMax = 0.0f;
+  m.xMin = 0;
+  m.xMax = 0;
   m.applyDiff = false;
   m.isActive = true;
   m.wasTriggered = false;
@@ -85,11 +75,19 @@ void StimDetector::addModule()
   m.startIndex = -1;
   m.windowIndex = -1;
   m.count = 0;
+  m.timestamps.resize(AVG_LENGTH);
   m.stim.resize(AVG_LENGTH);
   m.avg.resize(AVG_LENGTH);
-  m.timestamps.resize(AVG_LENGTH);
-  
+ 
+  m.matrix.add (m.avg);
+  m.activeRow = 0;
+  m.yAvgMin.add(0.0f);
+  m.yAvgMax.add(0.0f);
+  m.xAvgMin.add(0);
+  m.xAvgMax.add(0);
+
   modules.add (m);
+
 }
 
 void StimDetector::setActiveModule (int i)
@@ -101,37 +99,41 @@ void StimDetector::setParameter (int parameterIndex, float newValue)
 {
   DetectorModule& module = modules.getReference (activeModule);
 
-  if (parameterIndex == 1) // empty
+  if (parameterIndex == 1) // applyDiff
   {
-  module.applyDiff = (bool) newValue;
+    module.applyDiff = (bool) newValue;
   }
   else if (parameterIndex == 2)   // inputChan
   {
-  module.inputChan = (int) newValue;
+    module.inputChan = (int) newValue;
   }
   else if (parameterIndex == 3)   // outputChan
   {
-  module.outputChan = (int) newValue;
+    module.outputChan = (int) newValue;
   }
   else if (parameterIndex == 4)   // gateChan
   {
-  module.gateChan = (int) newValue;
-  if (module.gateChan < 0)
-  {
-    module.detectorStim = true;
+    module.gateChan = (int) newValue;
+    if (module.gateChan < 0)
+    {
+      module.detectorStim = true;
+    }
+    else
+    {
+      module.detectorStim = false;
+    }
   }
-  else
+  else if (parameterIndex == 5) // threshold
   {
-    module.detectorStim = false;
-  }
-  }
-  else if(parameterIndex == 5) // threshold
-  {
-  if (newValue <= 0.01 || newValue >= 10000.0f)
-    return;
+    if (newValue <= 0.01 || newValue >= 10000.0f)
+      return;
     
-  module.threshold = (double) newValue;
-  editor->updateParameterButtons (parameterIndex);
+    module.threshold = (double) newValue;
+    editor->updateParameterButtons (parameterIndex);
+  }
+  else if (parameterIndex == 6) // activeRow
+  {
+    module.activeRow = (int) newValue;
   }
 }
 
@@ -239,94 +241,109 @@ void StimDetector::process(AudioSampleBuffer& buffer)
       int bufferLength = getNumSamples(module.inputChan);
       for (int i = 0; i < bufferLength; ++i)
       {
-      const float sample = *buffer.getReadPointer(module.inputChan, i);
-      const float diffSample = sample - module.lastSample;
+        const float sample = *buffer.getReadPointer(module.inputChan, i);
+        const float diffSample = sample - module.lastSample;
 
-      if (module.applyDiff)
-      {
-        *buffer.getWritePointer(module.inputChan, i) = diffSample;
-      }
-
-      if (module.detectorStim) // Gate disableded
-      {
-        if (diffSample > module.lastDiff    //variacao brusca
-        && diffSample > module.threshold    //acima do limiar
-        && !module.startStim)               //fora do TTL
+        if (module.applyDiff)
         {
-        //inicia TTL
-        uint8 ttlData = 1 << module.outputChan;
-        TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
-        addEvent(moduleEventChannels[m], event, i);
-        module.samplesSinceTrigger = 0;
-        module.wasTriggered = true;
-        module.startStim = true;
-
-        //config avg
-        module.startIndex = i;
-        module.windowIndex = 0;
-        module.count++;
+          *buffer.getWritePointer(module.inputChan, i) = diffSample;
         }
 
-        //durante TTL
-        if (module.wasTriggered)
+        if (module.detectorStim) // Gate disableded
         {
-        //finalizacao do TTL
-          if (module.samplesSinceTrigger > TTL_LENGTH)
+          if (diffSample > module.lastDiff    //variacao brusca
+          && diffSample > module.threshold    //acima do limiar
+          && !module.startStim)               //fora do TTL
           {
-            uint8 ttlData = 0;
+            //start TTL
+            uint8 ttlData = 1 << module.outputChan;
             TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
             addEvent(moduleEventChannels[m], event, i);
-            module.wasTriggered = false;
+            module.samplesSinceTrigger = 0;
+            module.wasTriggered = true;
+            module.startStim = true;
+
+            //config avg
+            module.startIndex = i;
+            module.windowIndex = 0;
+            module.count++;
           }
-          else
+
+          //durante TTL
+          if (module.wasTriggered)
           {
-            module.samplesSinceTrigger++;
+          //finalizacao do TTL
+            if (module.samplesSinceTrigger > TTL_LENGTH)
+            {
+              uint8 ttlData = 0;
+              TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
+              addEvent(moduleEventChannels[m], event, i);
+              module.wasTriggered = false;
+            }
+            else
+            {
+              module.samplesSinceTrigger++;
+            }
           }
+        } // end gate disableded
+
+        /* TTL gate enableded */
+        if (!module.detectorStim && module.startStim)
+        {
+          module.startIndex = i;
+          module.windowIndex = 0;
+          module.count++;
+          module.startStim = false;
         }
-      } // end gate disableded
 
-      /* TTL gate enableded */
-      if (!module.detectorStim && module.startStim)
-      {
-        module.startIndex = i;
-        module.windowIndex = 0;
-        module.count++;
-        module.startStim = false;
-      }
+        // inside window
+        if (module.startIndex >= 0 && module.windowIndex < AVG_LENGTH)
+        {
+          module.stim.set(module.windowIndex, sample);
+          module.timestamps.set(module.windowIndex, getTimestamp(module.inputChan));
 
-      // esta dentro da janela
-      if (module.startIndex >= 0 && module.windowIndex < AVG_LENGTH)
-      {
-        module.stim.set(module.windowIndex, sample);
-        module.timestamps.set(module.windowIndex, getTimestamp(module.inputChan));
-
-        module.avg.set(module.windowIndex, (module.avg[module.windowIndex] * ((double)module.count - 1) + sample) / (double)(module.count));
+          // std::cout << module.avg[module.windowIndex] << "*" << module.count - 1 << "+" << sample << "/" << module.count << std::endl;
+          module.avg.set(module.windowIndex, (module.avg[module.windowIndex] * ((double)module.count - 1) + sample) / (double)(module.count));
         
-        if (module.avg[module.windowIndex] < module.yAvgMin && module.windowIndex >= TTL_LENGTH)
-        {
-          module.xAvgMin = getTimestamp(module.inputChan);
-          module.yAvgMin = module.avg[module.windowIndex];
+
+          if (module.avg[module.windowIndex] < module.yAvgMin[module.activeRow]
+            && module.windowIndex >= TTL_LENGTH)
+          {
+            //std::cout << module.avg[module.windowIndex] << " < " << module.yAvgMin[module.activeRow];
+            //std::cout << "==>  min [avg " << module.windowIndex << "] < [y" << module.activeRow << "]  " << module.xAvgMin[module.activeRow] << " <- ";
+            module.xAvgMin.set(module.activeRow, getTimestamp(module.inputChan));
+            module.yAvgMin.set(module.activeRow, module.avg[module.windowIndex]);
+            //std::cout << module.xAvgMin[module.activeRow] << std::endl;
+          }
+          if (module.avg[module.windowIndex] > module.yAvgMax[module.activeRow]
+            && module.windowIndex >= TTL_LENGTH)
+          {
+            //std::cout << module.avg[module.windowIndex] << " > " << module.yAvgMax[module.activeRow];
+            //std::cout << "==>  MAX [avg " << module.windowIndex << "] > [y" << module.activeRow << "]  " << module.xAvgMax[module.activeRow] << " <- ";
+            module.xAvgMax.set(module.activeRow, getTimestamp(module.inputChan));
+            module.yAvgMax.set(module.activeRow, module.avg[module.windowIndex]);
+            //std::cout << module.xAvgMax[module.activeRow] << std::endl;
+          }
+
+          //output
+          //*buffer.getWritePointer(module.inputChan, i) = module.avg[module.windowIndex];
+        
+          //if(module.windowIndex == AVG_LENGTH - 1) // last window loop
+          //{
+          //  std::cout << "xAvgMin: " << module.xAvgMin[module.activeRow] << ", xAvgMax: " << module.xAvgMax[module.activeRow] << std::endl;
+          //} 
+
+          module.windowIndex++;
         }
-        if (module.avg[module.windowIndex] > module.yAvgMax && module.windowIndex >= TTL_LENGTH)
-        {
-          module.xAvgMax = getTimestamp(module.inputChan);
-          module.yAvgMax = module.avg[module.windowIndex];
+        else {
+          // disabled references
+          module.startIndex = -1;
+          module.windowIndex = -1;
+          module.startStim = false;
         }
 
-        //output
-        //media[module.windowIndex] = (media[module.windowIndex] * ((double)module.count - 1) + sample) / (double)(module.count);
-        //*buffer.getWritePointer(module.inputChan, i) = module.avg[module.windowIndex];
-        module.windowIndex++;
-      }
-      else {
-        // desativa referencias
-        module.startIndex = -1;
-        module.windowIndex = -1;
-        module.startStim = false;
-      }
-
-      module.lastSample = sample;
-      module.lastDiff = diffSample;
+        module.lastSample = sample;
+        module.lastDiff = diffSample;
       }
     }
   }
@@ -365,21 +382,49 @@ void StimDetector::process(AudioSampleBuffer& buffer)
 
 void StimDetector::splitAvgArray()
 {
+  //ScopedLock resetLock(onlineReset);
+  //alocar uma nova linha na matriz
+  DetectorModule& m = modules.getReference(activeModule);
   
+  m.yAvgMin.add(0.0f);
+  m.yAvgMax.add(0.0f);
+  m.xAvgMin.add(0);
+  m.xAvgMax.add(0);
+
+  m.matrix.resize(m.activeRow + 2);
+  m.matrix[m.activeRow + 1].resize(m.matrix[0].size());
+
+  m.count = 0;
+  m.activeRow++;
 }
 
 void StimDetector::clearAgvArray()
 {
-  ScopedLock resetLock(onlineReset);
+  //ScopedLock resetLock(onlineReset);
 
-  DetectorModule& module = modules.getReference(activeModule);
-  module.avg.clear();
-  module.avg.resize(AVG_LENGTH);
-  module.count = 0;
-  module.yAvgMin = 0.0f;
-  module.yAvgMax = 0.0f;
-  module.xAvgMin = 0.0f;
-  module.xAvgMax = 0.0f;
+  DetectorModule& m = modules.getReference(activeModule);
+  m.matrix.resize(1);
+  m.matrix[0].clear();
+  m.matrix[0].resize(AVG_LENGTH);
+  m.activeRow = 0;
+  
+  m.count = 0;
+
+  m.avg.clear();
+  m.avg.resize(AVG_LENGTH);
+
+  m.yAvgMin.clear();
+  m.yAvgMin.add(0.0f);
+  
+  m.yAvgMax.clear();
+  m.yAvgMax.add(0.0f);
+  
+  m.xAvgMin.clear();
+  m.xAvgMin.add(0.0f);
+  
+  m.xAvgMax.clear();
+  m.xAvgMax.add(0.0f);
+
 }
 
 int StimDetector::getActiveModule() {
@@ -434,23 +479,31 @@ Array<double> StimDetector::getLastWaveformParams()
 
 Array<Array<double>> StimDetector::getAvgMatrixParams()
 {
-  Array<Array<double>> allModulesParams;
-  //for (int m = 0; m < modules.size(); ++m)
-  //{
   DetectorModule& dm = modules.getReference(activeModule);
 
-  double slope = dm.xAvgMax - dm.xAvgMin == 0 ? 0
-    : atan((dm.yAvgMax - dm.yAvgMin) / (dm.xAvgMax - dm.xAvgMin)) * 180 / PI;
+//  for (int j = 0; j < dm.avg.size(); j++)
+//  {
+//    for (int i = 0; i < dm.avg[0].size(); i++)
+//    {
+//      std::cout << "[" << j << "][" << i << "] " << dm.matrix[j][i] << std::endl;
+//    }
+//  }
 
-  Array<double> thisModuleParams;
-  thisModuleParams.add(dm.yAvgMin);               //MIN
-  thisModuleParams.add(dm.yAvgMax);               //MAX
-  thisModuleParams.add(dm.yAvgMax - dm.yAvgMin);  //PEAK TO PEAK
-  thisModuleParams.add(dm.xAvgMax - dm.xAvgMin);  //LATENCY
-  thisModuleParams.add(slope);                    //SLOPE
-  thisModuleParams.add(dm.count);                 //AVG COUNT
+  for (int r = 0; r <=dm.activeRow; r++)
+  {
+    double slope = dm.xAvgMax[r] - dm.xAvgMin[r] == 0 ? 0
+      : atan((dm.yAvgMax[r] - dm.yAvgMin[r]) / (dm.xAvgMax[r] - dm.xAvgMin[r])) * 180 / PI;
 
-  allModulesParams.add(thisModuleParams); //row of table
-  //}
-  return allModulesParams;
+    Array<double> rowParams;
+    rowParams.add(dm.yAvgMin[r]);                   //MIN
+    rowParams.add(dm.yAvgMax[r]);                   //MAX
+    rowParams.add(dm.yAvgMax[r] - dm.yAvgMin[r]);   //PEAK TO PEAK
+    rowParams.add(dm.xAvgMax[r] - dm.xAvgMin[r]);   //LATENCY
+    rowParams.add(slope);                           //SLOPE
+    rowParams.add(dm.count);                        //AVG COUNT
+
+    dm.matrix.set(dm.activeRow,rowParams);          //row of table
+  }
+
+  return dm.matrix;
 }
