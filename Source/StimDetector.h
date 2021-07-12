@@ -31,8 +31,8 @@
 
 #include <ProcessorHeaders.h>
 
-#define AVG_LENGTH 487
-#define TTL_LENGTH 10
+//#define AVG_LENGTH 487
+//#define TTL_LENGTH 10
 
 namespace StimDetectorSpace {
 
@@ -74,15 +74,18 @@ namespace StimDetectorSpace {
   private:
     void handleEvent (const EventChannel* channelInfo, const MidiMessage& event, int sampleNum) override;
 
-    enum ModuleType
-    {
-      NONE, PEAK
-    };
+    void updateWaveformParams();
+    void updateActiveAvgLineParams();
 
-    enum PhaseType
-    {
-      NO_PHASE, FALLING_POS
-    };
+    //enum ModuleType
+    //{
+    //  NONE, PEAK
+    //};
+
+    //enum PhaseType
+    //{
+    //  NO_PHASE, FALLING_POS
+    //};
     struct DetectorModule
     {
       int inputChan;              //electrode input channel
@@ -98,15 +101,18 @@ namespace StimDetectorSpace {
       bool applyDiff;             //overwrite input chan data
       bool isActive;              //channels to display in canvas
       bool wasTriggered;          //ttl interval
+      bool wasTriggered_buffer;   //ttl interval inside the entire buffer
       bool startStim;             //stim interval
       bool detectorStim;          //internal ttl detector
+      bool ignoreFirst;           //fix first diff value
 
       int startIndex;             //intput index
       int windowIndex;            //avg index
       int count;                  //avg count
  
-      Array<double> stim;         //avg of stims
+      Array<double> stim;         //original stim
       Array<int64> timestamps;    //last stim timestamps
+      Array<double> stimMean;     //moving mean array for max and min calculation
       double yMax;                //max of stim
       double yMin;                //min of stim
       int64 xMax;                 //time of max
@@ -121,14 +127,19 @@ namespace StimDetectorSpace {
       Array<int64> xAvgMin;         //time of avg min
 
       //StimPlot* stimPlot;         //Canvas Component
-      ModuleType type;
-      PhaseType phase;
+      //ModuleType type;
+      //PhaseType phase;
     };
 
     Array<DetectorModule> modules;
     int activeModule;
     int lastNumInputs;
     double defaultThreshold;
+
+    int avgLength;
+    int ttlLength;
+    int movMean;
+    int buffetMin;
 
     //CriticalSection onlineReset;
 

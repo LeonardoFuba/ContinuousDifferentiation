@@ -37,6 +37,11 @@ StimDetector::StimDetector()
 {
   setProcessorType (PROCESSOR_TYPE_FILTER);
   lastNumInputs = 1;
+
+  avgLength = 1;
+  ttlLength = 1;
+  buffetMin = 1;
+  movMean = 1;
 }
 
 StimDetector::~StimDetector()
@@ -70,14 +75,17 @@ void StimDetector::addModule()
   m.applyDiff = false;
   m.isActive = true;
   m.wasTriggered = false;
+  m.wasTriggered_buffer = false;
   m.startStim = false;
   m.detectorStim = true;
+  m.ignoreFirst = true;
   m.startIndex = -1;
   m.windowIndex = -1;
   m.count = 0;
-  m.timestamps.resize(AVG_LENGTH);
-  m.stim.resize(AVG_LENGTH);
-  m.avg.resize(AVG_LENGTH);
+  m.timestamps.resize(avgLength);
+  m.stim.resize(avgLength);
+  m.avg.resize(avgLength);
+  m.stimMean.resize(avgLength);
  
   m.matrix.add (m.avg);
   m.activeRow = 0;
@@ -209,7 +217,7 @@ void StimDetector::handleEvent(const EventChannel* channelInfo, const MidiMessag
     {
       DetectorModule& module = modules.getReference(i);
 
-      if (module.gateChan == eventChannel && module.startIndex < 0)
+      if (module.gateChan == eventChannel && module.startIndex < 0) //gate receive TTL outside stim
       {
         if (eventId)
         {
@@ -233,6 +241,21 @@ void StimDetector::process(AudioSampleBuffer& buffer)
   {
     DetectorModule& module = modules.getReference(m);
 
+    avgLength = (int)ceil(getDataChannel(module.inputChan)->getSampleRate() * 0.040); //total de pontos que precisamos para olharr o potencial na janela de 40 ms
+    ttlLength = (int)ceil(getDataChannel(module.inputChan)->getSampleRate() * 0.005); //dura��o m�xima do TTL (timestamps para ignorar): 5 ms
+    movMean = (int)ceil(getDataChannel(module.inputChan)->getSampleRate() * 0.005); //MOVING MEAN WINDOW SIZE 
+    //buffetMin = ceil(getDataChannel(module.inputChan)->getSampleRate() / 1024); //Quantos buffers precisamos por segundo de registro (na frente multiplicamos pelo tamanho da janela de 40 ms)
+
+    //std::cout << "AVG_LENGTH " << avgLength << std::endl;
+    //std::cout << "TTL_LENGTH " << ttlLength << std::endl;
+    //std::cout << "MOV_MEAN "   << movMean << std::endl;
+
+    module.timestamps.resize(avgLength);
+    module.stim.resize(avgLength);
+    module.avg.resize(avgLength);
+    module.stimMean.resize(avgLength);
+
+
     // check to see if it's active and has a channel
     if (module.outputChan >= 0
       && module.inputChan >= 0
@@ -244,16 +267,20 @@ void StimDetector::process(AudioSampleBuffer& buffer)
         const float sample = *buffer.getReadPointer(module.inputChan, i);
         const float diffSample = sample - module.lastSample;
 
+        module.ignoreFirst = (getTimestamp(module.inputChan) == 0 && i == 0);
+
         if (module.applyDiff)
         {
           *buffer.getWritePointer(module.inputChan, i) = diffSample;
         }
 
-        if (module.detectorStim) // Gate disableded
+        if (module.detectorStim)                // Gate disableded
         {
-          if (diffSample > module.lastDiff    //variacao brusca
-          && diffSample > module.threshold    //acima do limiar
-          && !module.startStim)               //fora do TTL
+          if (diffSample > module.lastDiff      //variacao brusca
+          && diffSample > module.threshold      //acima do limiar
+          && diffSample < 5 * module.threshold  //ignorar valores muito maiores do limiar
+          && !module.startStim                  //fora do TTL
+          && !module.ignoreFirst)               //nao e o primeiro
           {
             //start TTL
             uint8 ttlData = 1 << module.outputChan;
@@ -261,6 +288,7 @@ void StimDetector::process(AudioSampleBuffer& buffer)
             addEvent(moduleEventChannels[m], event, i);
             module.samplesSinceTrigger = 0;
             module.wasTriggered = true;
+            //module.wasTriggered_buffer = true;
             module.startStim = true;
 
             //config avg
@@ -273,7 +301,7 @@ void StimDetector::process(AudioSampleBuffer& buffer)
           if (module.wasTriggered)
           {
           //finalizacao do TTL
-            if (module.samplesSinceTrigger > TTL_LENGTH)
+            if (module.samplesSinceTrigger > ttlLength)
             {
               uint8 ttlData = 0;
               TTLEventPtr event = TTLEvent::createTTLEvent(moduleEventChannels[m], getTimestamp(module.inputChan) + i, &ttlData, sizeof(uint8), module.outputChan);
@@ -288,46 +316,26 @@ void StimDetector::process(AudioSampleBuffer& buffer)
         } // end gate disableded
 
         /* TTL gate enableded */
-        if (!module.detectorStim && module.startStim)
+        if (!module.detectorStim && module.startStim) //gate receive TTL
         {
           module.startIndex = i;
           module.windowIndex = 0;
           module.count++;
           module.startStim = false;
+          //module.wasTriggered_buffer = true;
         }
 
         // inside window
-        if (module.startIndex >= 0 && module.windowIndex < AVG_LENGTH)
+        if (module.startIndex >= 0 && module.windowIndex < avgLength)
         {
           module.stim.set(module.windowIndex, sample);
-          module.timestamps.set(module.windowIndex, getTimestamp(module.inputChan));
+          module.timestamps.set(module.windowIndex, getTimestamp(module.inputChan) + i); ///conferir
 
           // std::cout << module.avg[module.windowIndex] << "*" << module.count - 1 << "+" << sample << "/" << module.count << std::endl;
           module.avg.set(module.windowIndex, (module.avg[module.windowIndex] * ((double)module.count - 1) + sample) / (double)(module.count));
         
-
-          if (module.avg[module.windowIndex] < module.yAvgMin[module.activeRow]
-            && module.windowIndex >= TTL_LENGTH)
-          {
-            //std::cout << module.avg[module.windowIndex] << " < " << module.yAvgMin[module.activeRow];
-            //std::cout << "==>  min [avg " << module.windowIndex << "] < [y" << module.activeRow << "]  " << module.xAvgMin[module.activeRow] << " <- ";
-            module.xAvgMin.set(module.activeRow, getTimestamp(module.inputChan));
-            module.yAvgMin.set(module.activeRow, module.avg[module.windowIndex]);
-            //std::cout << module.xAvgMin[module.activeRow] << std::endl;
-          }
-          if (module.avg[module.windowIndex] > module.yAvgMax[module.activeRow]
-            && module.windowIndex >= TTL_LENGTH)
-          {
-            //std::cout << module.avg[module.windowIndex] << " > " << module.yAvgMax[module.activeRow];
-            //std::cout << "==>  MAX [avg " << module.windowIndex << "] > [y" << module.activeRow << "]  " << module.xAvgMax[module.activeRow] << " <- ";
-            module.xAvgMax.set(module.activeRow, getTimestamp(module.inputChan));
-            module.yAvgMax.set(module.activeRow, module.avg[module.windowIndex]);
-            //std::cout << module.xAvgMax[module.activeRow] << std::endl;
-          }
-
           //output
           //*buffer.getWritePointer(module.inputChan, i) = module.avg[module.windowIndex];
-        
           //if(module.windowIndex == AVG_LENGTH - 1) // last window loop
           //{
           //  std::cout << "xAvgMin: " << module.xAvgMin[module.activeRow] << ", xAvgMax: " << module.xAvgMax[module.activeRow] << std::endl;
@@ -335,11 +343,20 @@ void StimDetector::process(AudioSampleBuffer& buffer)
 
           module.windowIndex++;
         }
-        else {
+        else { //avgLength ended
+          
+          if (module.startStim)
+          {
+            updateWaveformParams();
+            updateActiveAvgLineParams();
+            //std::cout << module.xMin << ", " << module.yMin << ", " << module.xMax << ", " << module.yMax << ", " << (((module.yMax - module.yMin) / abs(module.xMax - module.xMin))) << ", " << (module.xMin - module.timestamps[1] + ttlLength) / (getDataChannel(module.inputChan)->getSampleRate()) * 1000 << std::endl;
+          }
+
           // disabled references
           module.startIndex = -1;
           module.windowIndex = -1;
           module.startStim = false;
+          module.wasTriggered_buffer = false;
         }
 
         module.lastSample = sample;
@@ -405,13 +422,13 @@ void StimDetector::clearAgvArray()
   DetectorModule& m = modules.getReference(activeModule);
   m.matrix.resize(1);
   m.matrix[0].clear();
-  m.matrix[0].resize(AVG_LENGTH);
+  m.matrix[0].resize(avgLength);
   m.activeRow = 0;
   
   m.count = 0;
 
   m.avg.clear();
-  m.avg.resize(AVG_LENGTH);
+  m.avg.resize(avgLength);
 
   m.yAvgMin.clear();
   m.yAvgMin.add(0.0f);
@@ -420,11 +437,117 @@ void StimDetector::clearAgvArray()
   m.yAvgMax.add(0.0f);
   
   m.xAvgMin.clear();
-  m.xAvgMin.add(0.0f);
+  m.xAvgMin.add(0);
   
   m.xAvgMax.clear();
-  m.xAvgMax.add(0.0f);
+  m.xAvgMax.add(0);
 
+}
+
+void StimDetector::updateWaveformParams()
+{
+  for (int m = 0; m < modules.size(); ++m)
+  {
+    DetectorModule& dm = modules.getReference(m);
+
+    dm.stimMean = dm.stim; //Array
+    dm.xMin = 0;
+    dm.yMin = 0;
+    int tMin = 0;
+
+    //suavisar a curva
+    for (int t = movMean; t < (avgLength - movMean); t++)
+    {
+      double aux_mean = 0;
+      for (int tt = -(movMean / 2); tt < ((movMean / 2)); tt++)
+      {
+        aux_mean = aux_mean + dm.stim[(t + tt)];
+        //std::cout << (tt) << std::endl;
+      }
+
+      dm.stimMean.set(t, (aux_mean / (movMean)));
+      //std::cout << dm.stimMean[t] << std::endl;
+    }
+
+    //std::cout << dm.stimMean << ", " << dm.stim[tMin - 2] << ", " << dm.stim[tMin - 1] << std::endl;
+
+    //MIN
+    for (int t = 0; t < avgLength; t++)
+    {
+      if (dm.stimMean[t] < dm.yMin && t >= ttlLength)
+      {
+        dm.xMin = dm.timestamps[t];
+        dm.yMin = dm.stim[t];
+        tMin = t; //ref
+      }
+    }
+    //std::cout << dm.yMin << ", " << dm.xMin << std::endl;
+
+
+    //MAX
+    dm.xMax = dm.xMin;
+    dm.yMax = dm.yMin;
+    for (int tMax = tMin; dm.stimMean[tMax - 1] > dm.stimMean[tMax]; tMax--)
+    {
+      dm.xMax = dm.timestamps[tMax];
+      dm.yMax = dm.stim[tMax];
+      // std::cout << yMax << ", " << dm.stim[yMax - 1] << ", " << dm.stim[yMax] << std::endl;
+    }
+    //std::cout << yMax << ", " << dm.stim[yMax - 2] << ", " << dm.stim[yMax - 1] << std::endl;
+  }
+}
+
+void StimDetector::updateActiveAvgLineParams()
+{
+  for (int m = 0; m < modules.size(); ++m)
+  {
+    DetectorModule& dm = modules.getReference(m);
+
+    dm.stimMean = dm.avg; //Array
+    dm.xAvgMin.set(dm.activeRow,0);
+    dm.yAvgMin.set(dm.activeRow,0);
+    int tMin = 0;
+
+    //suavisar a curva
+    for (int t = movMean; t < (avgLength - movMean); t++)
+    {
+      double aux_mean = 0;
+      for (int tt = -(movMean / 2); tt < ((movMean / 2)); tt++)
+      {
+        aux_mean = aux_mean + dm.avg[(t + tt)];
+        //std::cout << (tt) << std::endl;
+      }
+
+      dm.stimMean.set(t, (aux_mean / (movMean)));
+      //std::cout << dm.stimMean[t] << std::endl;
+    }
+
+    //std::cout << dm.stimMean << ", " << dm.stim[tMin - 2] << ", " << dm.stim[tMin - 1] << std::endl;
+
+    //MIN
+    for (int t = 0; t < avgLength; t++)
+    {
+      if (dm.stimMean[t] < dm.yAvgMin[dm.activeRow] && t >= ttlLength)
+      {
+        dm.xAvgMin.set(dm.activeRow, dm.timestamps[t]);
+        dm.yAvgMin.set(dm.activeRow, dm.stim[t]);
+        tMin = t; //ref
+      }
+    }
+    //std::cout << dm.yMin << ", " << dm.xMin << std::endl;
+
+
+    //MAX
+    dm.xAvgMax.set(dm.activeRow, dm.xMin);
+    dm.yAvgMax.set(dm.activeRow, dm.yMin);
+    for (int tMax = tMin; dm.stimMean[tMax - 1] > dm.stimMean[tMax]; tMax--)
+    {
+      dm.xAvgMax.set(dm.activeRow, dm.timestamps[tMax]);
+      dm.yAvgMax.set(dm.activeRow, dm.stim[tMax]);
+      // std::cout << yMax << ", " << dm.stim[yMax - 1] << ", " << dm.stim[yMax] << std::endl;
+    }
+    //std::cout << yMax << ", " << dm.stim[yMax - 2] << ", " << dm.stim[yMax - 1] << std::endl;
+  }
 }
 
 int StimDetector::getActiveModule() {
@@ -441,36 +564,17 @@ Array<double> StimDetector::getLastWaveformParams()
 {
   DetectorModule& dm = modules.getReference(activeModule);
 
-  dm.xMin = 0.0f;
-  dm.yMin = 0.0f;
-  for (int t = 0; t < AVG_LENGTH; t++)
-  {
-    if (dm.stim[t] < dm.yMin && t >= TTL_LENGTH)
-    {
-      dm.xMin = dm.timestamps[t];
-      dm.yMin = dm.stim[t];
-    }
-  }
-
-  dm.xMax = dm.xMin;
-  dm.yMax = dm.yMin;
-  for (int t = 0; t < AVG_LENGTH; t++)
-  {
-    if (dm.stim[t] > dm.yMax && t >= TTL_LENGTH)
-    {
-      dm.xMax = dm.timestamps[t];
-      dm.yMax = dm.stim[t];
-    }
-  }
- 
   double slope = dm.xMax - dm.xMin == 0 ? 0
-    : atan((dm.yMax - dm.yMin) / (dm.xMax - dm.xMin)) * 180 / PI;
+    : ((dm.yMax - dm.yMin) / abs(dm.xMax - dm.xMin));
+
+  double latency = dm.count == 0 ? 0
+    : (double)(dm.xMin - dm.timestamps[1] + ttlLength) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000;
 
   Array<double> moduleParams;
   moduleParams.add(dm.yMin);              //MIN
   moduleParams.add(dm.yMax);              //MAX
   moduleParams.add(dm.yMax - dm.yMin);    //PEAK TO PEAK
-  moduleParams.add(dm.xMax - dm.xMin);    //LATENCY
+  moduleParams.add(latency);              //LATENCY
   moduleParams.add(slope);                //SLOPE
   moduleParams.add(dm.count);             //AVG COUNT
 
@@ -481,24 +585,27 @@ Array<Array<double>> StimDetector::getAvgMatrixParams()
 {
   DetectorModule& dm = modules.getReference(activeModule);
 
-//  for (int j = 0; j < dm.avg.size(); j++)
-//  {
-//    for (int i = 0; i < dm.avg[0].size(); i++)
-//    {
-//      std::cout << "[" << j << "][" << i << "] " << dm.matrix[j][i] << std::endl;
-//    }
-//  }
+  //  for (int j = 0; j < dm.avg.size(); j++)
+  //  {
+  //    for (int i = 0; i < dm.avg[0].size(); i++)
+  //    {
+  //      std::cout << "[" << j << "][" << i << "] " << dm.matrix[j][i] << std::endl;
+  //    }
+  //  }
 
   for (int r = 0; r <=dm.activeRow; r++)
   {
     double slope = dm.xAvgMax[r] - dm.xAvgMin[r] == 0 ? 0
-      : atan((dm.yAvgMax[r] - dm.yAvgMin[r]) / (dm.xAvgMax[r] - dm.xAvgMin[r])) * 180 / PI;
+      : ((dm.yAvgMax[r] - dm.yAvgMin[r]) / abs(dm.xAvgMax[r] - dm.xAvgMin[r]));
+
+    double latency = dm.count == 0 ? 0
+      : (double)(dm.xAvgMin[r] - dm.timestamps[1] + ttlLength) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000;
 
     Array<double> rowParams;
     rowParams.add(dm.yAvgMin[r]);                   //MIN
     rowParams.add(dm.yAvgMax[r]);                   //MAX
     rowParams.add(dm.yAvgMax[r] - dm.yAvgMin[r]);   //PEAK TO PEAK
-    rowParams.add(dm.xAvgMax[r] - dm.xAvgMin[r]);   //LATENCY
+    rowParams.add(latency);                         //LATENCY
     rowParams.add(slope);                           //SLOPE
     rowParams.add(dm.count);                        //AVG COUNT
 
