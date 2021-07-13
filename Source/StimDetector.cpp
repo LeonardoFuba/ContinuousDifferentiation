@@ -265,7 +265,7 @@ void StimDetector::process(AudioSampleBuffer& buffer)
       for (int i = 0; i < bufferLength; ++i)
       {
         const float sample = *buffer.getReadPointer(module.inputChan, i);
-        const float diffSample = sample - module.lastSample;
+        const float diffSample = abs(sample - module.lastSample);
 
         module.ignoreFirst = (getTimestamp(module.inputChan) == 0 && i == 0);
 
@@ -328,7 +328,7 @@ void StimDetector::process(AudioSampleBuffer& buffer)
         // inside window
         if (module.startIndex >= 0 && module.windowIndex < avgLength)
         {
-          module.stim.set(module.windowIndex, sample);
+          module.stim.set(module.windowIndex, sample/(0.1950*1000));
           module.timestamps.set(module.windowIndex, getTimestamp(module.inputChan) + i); ///conferir
 
           // std::cout << module.avg[module.windowIndex] << "*" << module.count - 1 << "+" << sample << "/" << module.count << std::endl;
@@ -503,50 +503,13 @@ void StimDetector::updateActiveAvgLineParams()
   {
     DetectorModule& dm = modules.getReference(m);
 
-    dm.stimMean = dm.avg; //Array
-    dm.xAvgMin.set(dm.activeRow,0);
-    dm.yAvgMin.set(dm.activeRow,0);
-    int tMin = 0;
+    if(dm.count > 0) {
+      dm.xAvgMin.set(dm.activeRow, (dm.xAvgMin[dm.activeRow] * (dm.count - 1) + dm.xMin) / (double)(module.count));
+      dm.yAvgMin.set(dm.activeRow, (dm.yAvgMin[dm.activeRow] * (dm.count - 1) + dm.yMin) / (double)(module.count));
 
-    //suavisar a curva
-    for (int t = movMean; t < (avgLength - movMean); t++)
-    {
-      double aux_mean = 0;
-      for (int tt = -(movMean / 2); tt < ((movMean / 2)); tt++)
-      {
-        aux_mean = aux_mean + dm.avg[(t + tt)];
-        //std::cout << (tt) << std::endl;
-      }
-
-      dm.stimMean.set(t, (aux_mean / (movMean)));
-      //std::cout << dm.stimMean[t] << std::endl;
+      dm.xAvgMax.set(dm.activeRow, (dm.xAvgMax[dm.activeRow] * (dm.count - 1) + dm.xMax) / (double)(module.count));
+      dm.yAvgMax.set(dm.activeRow, (dm.yAvgMax[dm.activeRow] * (dm.count - 1) + dm.yMax) / (double)(module.count));
     }
-
-    //std::cout << dm.stimMean << ", " << dm.stim[tMin - 2] << ", " << dm.stim[tMin - 1] << std::endl;
-
-    //MIN
-    for (int t = 0; t < avgLength; t++)
-    {
-      if (dm.stimMean[t] < dm.yAvgMin[dm.activeRow] && t >= ttlLength)
-      {
-        dm.xAvgMin.set(dm.activeRow, dm.timestamps[t]);
-        dm.yAvgMin.set(dm.activeRow, dm.stim[t]);
-        tMin = t; //ref
-      }
-    }
-    //std::cout << dm.yMin << ", " << dm.xMin << std::endl;
-
-
-    //MAX
-    dm.xAvgMax.set(dm.activeRow, dm.xMin);
-    dm.yAvgMax.set(dm.activeRow, dm.yMin);
-    for (int tMax = tMin; dm.stimMean[tMax - 1] > dm.stimMean[tMax]; tMax--)
-    {
-      dm.xAvgMax.set(dm.activeRow, dm.timestamps[tMax]);
-      dm.yAvgMax.set(dm.activeRow, dm.stim[tMax]);
-      // std::cout << yMax << ", " << dm.stim[yMax - 1] << ", " << dm.stim[yMax] << std::endl;
-    }
-    //std::cout << yMax << ", " << dm.stim[yMax - 2] << ", " << dm.stim[yMax - 1] << std::endl;
   }
 }
 
@@ -565,10 +528,10 @@ Array<double> StimDetector::getLastWaveformParams()
   DetectorModule& dm = modules.getReference(activeModule);
 
   double slope = dm.xMax - dm.xMin == 0 ? 0
-    : ((dm.yMax - dm.yMin) / abs(dm.xMax - dm.xMin));
+    : (ttlLength + dm.yMax - dm.yMin) / ( (dm.xMax - dm.xMin) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) );
 
   double latency = dm.count == 0 ? 0
-    : (double)(dm.xMin - dm.timestamps[1] + ttlLength) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000;
+    : (double)(dm.xMin - dm.timestamps[0]) / ((double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000);
 
   Array<double> moduleParams;
   moduleParams.add(dm.yMin);              //MIN
@@ -585,21 +548,13 @@ Array<Array<double>> StimDetector::getAvgMatrixParams()
 {
   DetectorModule& dm = modules.getReference(activeModule);
 
-  //  for (int j = 0; j < dm.avg.size(); j++)
-  //  {
-  //    for (int i = 0; i < dm.avg[0].size(); i++)
-  //    {
-  //      std::cout << "[" << j << "][" << i << "] " << dm.matrix[j][i] << std::endl;
-  //    }
-  //  }
-
-  for (int r = 0; r <=dm.activeRow; r++)
+  for (int r = 0; r <= dm.activeRow; r++)
   {
     double slope = dm.xAvgMax[r] - dm.xAvgMin[r] == 0 ? 0
-      : ((dm.yAvgMax[r] - dm.yAvgMin[r]) / abs(dm.xAvgMax[r] - dm.xAvgMin[r]));
+      : (ttlLength + dm.yAvgMax[r] - dm.yAvgMin[r]) / ( (dm.xAvgMax[r] - dm.xAvgMin[r]) / (double)(getDataChannel(dm.inputChan)->getSampleRate()));
 
     double latency = dm.count == 0 ? 0
-      : (double)(dm.xAvgMin[r] - dm.timestamps[1] + ttlLength) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000;
+      : (double)(dm.xAvgMin[r] - dm.timestamps[0]) / ((double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000);
 
     Array<double> rowParams;
     rowParams.add(dm.yAvgMin[r]);                   //MIN

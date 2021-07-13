@@ -246,13 +246,13 @@ void StimDetectorCanvas::buttonClicked(Button* button)
   if (button == resetButton)
   {
     // Clears avg vector to start from scratch.
-     processor->clearAgvArray();
+    processor->clearAgvArray();
     // update();
   }
   else if(button == splitButton)
   {
     // Add new line and restart new avg calc
-
+    processor->splitAvgArray();
   }
 }
 
