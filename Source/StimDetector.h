@@ -63,7 +63,7 @@ namespace StimDetectorSpace {
     
     int getActiveModule();
     double getThresholdValueForActiveModule();
-    Array<double> getLastWaveformParams(); //paramIndex
+    Array<double> getLastWaveformParams(int module); //paramIndex
     Array<Array<double>> getAvgMatrixParams(); //AvgSection.paramIndex
 
     
@@ -119,12 +119,12 @@ namespace StimDetectorSpace {
       int64 xMin;                 //time of min
 
       Array<double> avg;            //avg of stims
-      Array<Array<double>> matrix;  //avg of stims
+      Array<Array<double>> matrix;  //matrix of avg params 
       int activeRow;                //last row of avg
       Array<double> yAvgMax;        //max of avg stim
       Array<double> yAvgMin;        //min of avg stim
-      Array<int64> xAvgMax;         //time of avg max
-      Array<int64> xAvgMin;         //time of avg min
+      Array<double> avgLatency;     //latency of avg stim
+      Array<double> avgSlope;       //slope of avg stim
 
       //StimPlot* stimPlot;         //Canvas Component
       //ModuleType type;

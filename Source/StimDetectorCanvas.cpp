@@ -216,7 +216,7 @@ void StimDetectorCanvas::refresh()
   title = createLabel("Title", "STIM PARAMETERS", Justification::centred, { 5, 5, canvas->getWidth(), 50 });
 
   //processor data  
-  last = processor->getLastWaveformParams();
+  last = processor->getLastWaveformParams(-1);
   avgMatrix = processor->getAvgMatrixParams();
   //std::cout << "avgMatrix: " << avgMatrix.size() << ", " << avgMatrix[0].size() << std::endl;
 

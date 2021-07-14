@@ -91,8 +91,8 @@ void StimDetector::addModule()
   m.activeRow = 0;
   m.yAvgMin.add(0.0f);
   m.yAvgMax.add(0.0f);
-  m.xAvgMin.add(0);
-  m.xAvgMax.add(0);
+  m.avgSlope.add(0.0f);
+  m.avgLatency.add(0.0f);
 
   modules.add (m);
 
@@ -338,7 +338,7 @@ void StimDetector::process(AudioSampleBuffer& buffer)
           //*buffer.getWritePointer(module.inputChan, i) = module.avg[module.windowIndex];
           //if(module.windowIndex == AVG_LENGTH - 1) // last window loop
           //{
-          //  std::cout << "xAvgMin: " << module.xAvgMin[module.activeRow] << ", xAvgMax: " << module.xAvgMax[module.activeRow] << std::endl;
+          //  std::cout << std::endl;
           //} 
 
           module.windowIndex++;
@@ -405,8 +405,8 @@ void StimDetector::splitAvgArray()
   
   m.yAvgMin.add(0.0f);
   m.yAvgMax.add(0.0f);
-  m.xAvgMin.add(0);
-  m.xAvgMax.add(0);
+  m.avgSlope.add(0.0f);
+  m.avgLatency.add(0.0f);
 
   m.matrix.resize(m.activeRow + 2);
   m.matrix[m.activeRow + 1].resize(m.matrix[0].size());
@@ -424,7 +424,7 @@ void StimDetector::clearAgvArray()
   m.matrix[0].clear();
   m.matrix[0].resize(avgLength);
   m.activeRow = 0;
-  
+
   m.count = 0;
 
   m.avg.clear();
@@ -436,11 +436,11 @@ void StimDetector::clearAgvArray()
   m.yAvgMax.clear();
   m.yAvgMax.add(0.0f);
   
-  m.xAvgMin.clear();
-  m.xAvgMin.add(0);
+  m.avgSlope.clear();
+  m.avgSlope.add(0.0f);
   
-  m.xAvgMax.clear();
-  m.xAvgMax.add(0);
+  m.avgLatency.clear();
+  m.avgLatency.add(0.0f);
 
 }
 
@@ -501,14 +501,15 @@ void StimDetector::updateActiveAvgLineParams()
 {
   for (int m = 0; m < modules.size(); ++m)
   {
+    Array<double> last = getLastWaveformParams(m);
     DetectorModule& dm = modules.getReference(m);
 
     if(dm.count > 0) {
-      dm.xAvgMin.set(dm.activeRow, (dm.xAvgMin[dm.activeRow] * (dm.count - 1) + dm.xMin) / (double)(module.count));
-      dm.yAvgMin.set(dm.activeRow, (dm.yAvgMin[dm.activeRow] * (dm.count - 1) + dm.yMin) / (double)(module.count));
+      dm.yAvgMin.set(dm.activeRow, (dm.yAvgMin[dm.activeRow] * ((double)dm.count - 1) + last[0]) / (double)(dm.count));
+      dm.yAvgMax.set(dm.activeRow, (dm.yAvgMax[dm.activeRow] * ((double)dm.count - 1) + last[1]) / (double)(dm.count));
 
-      dm.xAvgMax.set(dm.activeRow, (dm.xAvgMax[dm.activeRow] * (dm.count - 1) + dm.xMax) / (double)(module.count));
-      dm.yAvgMax.set(dm.activeRow, (dm.yAvgMax[dm.activeRow] * (dm.count - 1) + dm.yMax) / (double)(module.count));
+      dm.avgLatency.set(dm.activeRow, (dm.avgLatency[dm.activeRow] * ((double)dm.count - 1) + last[3]) / (double)(dm.count));
+      dm.avgSlope.set(dm.activeRow, (dm.avgSlope[dm.activeRow] * ((double)dm.count - 1) + last[4]) / (double)(dm.count));
     }
   }
 }
@@ -523,15 +524,15 @@ double StimDetector::getThresholdValueForActiveModule()
   return module.threshold;
 }
 
-Array<double> StimDetector::getLastWaveformParams()
+Array<double> StimDetector::getLastWaveformParams(int module=-1)
 {
-  DetectorModule& dm = modules.getReference(activeModule);
+  DetectorModule& dm = modules.getReference(module==-1 ? activeModule : module);
 
   double slope = dm.xMax - dm.xMin == 0 ? 0
-    : (ttlLength + dm.yMax - dm.yMin) / ( (dm.xMax - dm.xMin) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) );
+    : (((dm.yMax - dm.yMin) / abs(dm.xMax - dm.xMin)) / (double)(getDataChannel(dm.inputChan)->getSampleRate()));
 
   double latency = dm.count == 0 ? 0
-    : (double)(dm.xMin - dm.timestamps[0]) / ((double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000);
+    : (double)(ttlLength + dm.xMin - dm.timestamps[0]) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000;
 
   Array<double> moduleParams;
   moduleParams.add(dm.yMin);              //MIN
@@ -550,18 +551,13 @@ Array<Array<double>> StimDetector::getAvgMatrixParams()
 
   for (int r = 0; r <= dm.activeRow; r++)
   {
-    double slope = dm.xAvgMax[r] - dm.xAvgMin[r] == 0 ? 0
-      : (ttlLength + dm.yAvgMax[r] - dm.yAvgMin[r]) / ( (dm.xAvgMax[r] - dm.xAvgMin[r]) / (double)(getDataChannel(dm.inputChan)->getSampleRate()));
-
-    double latency = dm.count == 0 ? 0
-      : (double)(dm.xAvgMin[r] - dm.timestamps[0]) / ((double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000);
 
     Array<double> rowParams;
     rowParams.add(dm.yAvgMin[r]);                   //MIN
     rowParams.add(dm.yAvgMax[r]);                   //MAX
     rowParams.add(dm.yAvgMax[r] - dm.yAvgMin[r]);   //PEAK TO PEAK
-    rowParams.add(latency);                         //LATENCY
-    rowParams.add(slope);                           //SLOPE
+    rowParams.add(dm.avgLatency[r]);               //LATENCY
+    rowParams.add(dm.avgSlope[r]);                 //SLOPE
     rowParams.add(dm.count);                        //AVG COUNT
 
     dm.matrix.set(dm.activeRow,rowParams);          //row of table
