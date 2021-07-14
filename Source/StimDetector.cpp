@@ -529,7 +529,7 @@ Array<double> StimDetector::getLastWaveformParams(int module=-1)
   DetectorModule& dm = modules.getReference(module==-1 ? activeModule : module);
 
   double slope = dm.xMax - dm.xMin == 0 ? 0
-    : (((dm.yMax - dm.yMin) / abs(dm.xMax - dm.xMin)) / (double)(getDataChannel(dm.inputChan)->getSampleRate()));
+    : ((dm.yMax - dm.yMin) / ((dm.xMax - dm.xMin) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) ));
 
   double latency = dm.count == 0 ? 0
     : (double)(ttlLength + dm.xMin - dm.timestamps[0]) / (double)(getDataChannel(dm.inputChan)->getSampleRate()) * 1000;
